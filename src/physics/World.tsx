@@ -6,13 +6,15 @@ import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useReduceMotion } from '../services/motion';
 import { useGame } from '../state/gameStore';
 import { makeGeometry, WORLD, type RoomGeometry } from './geometry';
-import { stepBall, stepBody, stepTilt } from './simulation';
+import { clearMess, scatter, stepBall, stepBody, stepMess, stepTilt } from './simulation';
 import {
   initialBall,
   initialBody,
+  initialMess,
   initialTilt,
   type BallState,
   type BodyState,
+  type MessState,
   type PhysicsEventCode,
   type PhysicsParams,
   type TiltState,
@@ -50,6 +52,8 @@ export interface WorldCommands {
   teleport(x: number, z: number): void;
   freeze(on: boolean): void;
   resetZMax(): void;
+  /** Put everything back where it started: the stickman, the ball, and any shaken-about furniture. */
+  resetAll(): void;
 }
 
 export type PhysicsListener = (code: PhysicsEventCode, a: number, b: number) => void;
@@ -59,6 +63,8 @@ export interface World {
   body: SharedValue<BodyState>;
   ball: SharedValue<BallState>;
   tilt: SharedValue<TiltState>;
+  /** Furniture knocked out of place by a shake (offsets per slot, see MESS_ORDER). */
+  mess: SharedValue<MessState>;
   params: SharedValue<PhysicsParams>;
   clock: SharedValue<number>;
   mode: SharedValue<InteractionMode>;
@@ -106,6 +112,7 @@ export function WorldProvider({ children }: { children: ReactNode }) {
   );
   const ball = useSharedValue<BallState>(initialBall());
   const tilt = useSharedValue<TiltState>(initialTilt());
+  const mess = useSharedValue<MessState>(initialMess());
   const clock = useSharedValue(0);
   const mode = useSharedValue<InteractionMode>(0);
   const params = useSharedValue<PhysicsParams>({
@@ -117,6 +124,7 @@ export function WorldProvider({ children }: { children: ReactNode }) {
     calZ: 0,
     reduceMotion: 0,
     speedBoost: 1,
+    orientLocked: 0,
   });
   const pose = usePoseValues();
 
@@ -152,8 +160,31 @@ export function WorldProvider({ children }: { children: ReactNode }) {
     const bd = body.value;
     ball.modify((x) => {
       'worklet';
-      stepBall(x, bd, t, dt, now, events);
+      stepBall(x, bd, t, p, dt, now, events);
       return x;
+    });
+    // Shaken too hard this step: knock everything out of place.
+    if (t.messNow === 1) {
+      tilt.modify((tt) => {
+        'worklet';
+        tt.messNow = 0;
+        return tt;
+      });
+      const m = mess.value;
+      body.modify((b) => {
+        'worklet';
+        ball.modify((x) => {
+          'worklet';
+          scatter(m, b, x, p.reduceMotion);
+          return x;
+        });
+        return b;
+      });
+    }
+    mess.modify((m) => {
+      'worklet';
+      stepMess(m, dt);
+      return m;
     });
     for (let i = 0; i < events.length; i += 3) {
       scheduleOnRN(dispatch, events[i], events[i + 1], events[i + 2]);
@@ -324,12 +355,8 @@ export function WorldProvider({ children }: { children: ReactNode }) {
             b.vx = 0;
             b.vz = 0;
             b.vy = 0;
-            b.fallen = 0;
-            b.rot = 0;
-            b.rotV = 0;
-            b.wall = 0;
-            b.wallBlend = 0;
-            b.wallT = 0;
+            b.messRot = 0;
+            b.messRotV = 0;
             b.hasTarget = 0;
             b.chase = 0;
             b.anchored = 0;
@@ -351,6 +378,50 @@ export function WorldProvider({ children }: { children: ReactNode }) {
           });
         });
       },
+      resetAll() {
+        // Read on the JS thread: `initialBall` isn't a worklet, and calling it on
+        // the UI thread crashes the app on native (the web preview has one thread).
+        const fresh = initialBall();
+        scheduleOnUI(() => {
+          'worklet';
+          ball.modify((x) => {
+            'worklet';
+            x.x = fresh.x;
+            x.z = fresh.z;
+            x.y = 0;
+            x.vx = 0;
+            x.vz = 0;
+            x.vy = 0;
+            return x;
+          });
+          mess.modify((m) => {
+            'worklet';
+            clearMess(m);
+            return m;
+          });
+          body.modify((b) => {
+            'worklet';
+            b.x = 0.5;
+            b.z = 0.3;
+            b.y = 0;
+            b.vx = 0;
+            b.vz = 0;
+            b.vy = 0;
+            b.messRot = 0;
+            b.messRotV = 0;
+            b.recoil = 0;
+            b.recoilV = 0;
+            b.flail = 0;
+            b.squash = 0;
+            b.squashV = 0;
+            b.hasTarget = 0;
+            b.chase = 0;
+            b.anchored = 0;
+            b.zMax = WORLD.zMax;
+            return b;
+          });
+        });
+      },
       resetZMax() {
         scheduleOnUI(() => {
           'worklet';
@@ -367,6 +438,7 @@ export function WorldProvider({ children }: { children: ReactNode }) {
       body,
       ball,
       tilt,
+      mess,
       params,
       clock,
       mode,

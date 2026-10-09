@@ -6,10 +6,10 @@ import { useSensorStatus } from './sensorStatus';
 
 /**
  * Web preview only: there's no reliable gravity sensor in desktop browsers, so
- * arrow keys / WASD simulate tilting the phone, and holding Shift tilts hard
- * (enough to knock the stickman over, or flip gravity with Up). This is a
- * development aid and is labeled as a simulation in Settings — real tilt
- * needs a phone.
+ * arrow keys / WASD simulate tilting the phone, holding Shift tilts hard
+ * (enough to stand the stickman on that side, or on the ceiling with Up), and X is a
+ * hard shake. This is a development aid and is labeled as a simulation in
+ * Settings — real tilt needs a phone.
  */
 const NEUTRAL = { x: 0, y: -5.6, z: -8.0 }; // phone held at ~35°
 const TILT = 4.2; // ≈ 25° of tilt
@@ -45,6 +45,15 @@ export function GravitySensor({ tilt }: { tilt: SharedValue<TiltState> }) {
     const down = (e: KeyboardEvent) => {
       if (isTyping()) return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (key === 'x' && !e.repeat) {
+        // One press = a hard shake.
+        tilt.modify((t) => {
+          'worklet';
+          t.jolt += 3;
+          return t;
+        });
+        return;
+      }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', 'Shift'].includes(key)) return;
       e.preventDefault();
       held.add(key);

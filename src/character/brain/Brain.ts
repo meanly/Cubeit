@@ -294,9 +294,11 @@ export class Brain {
         return;
       }
       case PhysicsEvent.TiltStart: {
+        // Tilted: he stops what he's doing and gets carried along (onto a wall if it's tilted far enough).
+        const was = this.tiltActive;
         this.tiltActive = true;
-        if (!this.isFree() || this.held) return;
-        if (this.state === 'sleeping') return; // anchored sleepers only react if knocked out of bed
+        if (was || !this.isFree() || this.held) return;
+        if (this.state === 'sleeping') return; // sleepers stay tucked in
         this.interrupt(B.slide);
         return;
       }
@@ -305,9 +307,12 @@ export class Brain {
         fire(this.signals.tiltEnded);
         return;
       }
-      case PhysicsEvent.Dislodged: {
+      case PhysicsEvent.MessUp: {
+        // Shaken too hard: everything's knocked about, including him (and out of bed).
+        feedback('bump');
         this.awakeUntil = this.env.now() + 120_000;
-        if (this.isFree()) this.interrupt(B.reactSurprise(LINES.dislodged, 'surprised'));
+        useGame.getState().nudgeMood(-0.02, 0.02);
+        if (this.isFree()) this.interrupt(B.reactDizzy(LINES.messy));
         return;
       }
       case PhysicsEvent.BallHit: {

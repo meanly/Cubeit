@@ -1,12 +1,20 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { rebooted } from '../character/brain/behaviors';
+import { getBrain } from '../character/useCharacterBrain';
 import { deviceFinish, type DeviceFinish, type DeviceId } from '../content/devices';
+import { useWorld } from '../physics/World';
+import { feedback } from '../services/feedback';
+import { useReduceMotion } from '../services/motion';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 import { useTheme } from '../theme/theme';
 import { fonts } from '../theme/tokens';
+import { PressableScale } from '../ui/primitives';
+import { AppSymbol } from '../ui/Symbol';
 import { useSvgId } from '../ui/useSvgId';
 
 /** Housing around the bezel: sides/top, and the taller chin with the label and light. */
@@ -41,6 +49,7 @@ export function DeviceFrame({ children }: { children: ReactNode }) {
   const finish = useDeviceFinish();
   const styles = useMemo(() => makeStyles(finish), [finish]);
   const body = useSvgId('housing');
+  const restart = useScreenRestart();
   return (
     <View style={styles.shadow}>
       <View style={styles.housing}>
@@ -57,20 +66,91 @@ export function DeviceFrame({ children }: { children: ReactNode }) {
         {[styles.screwTL, styles.screwTR, styles.screwBL, styles.screwBR].map((pos, i) => (
           <View key={i} pointerEvents="none" style={[styles.screw, pos]} />
         ))}
-        <View style={styles.bezel}>{children}</View>
-        <View style={styles.chin} pointerEvents="none">
+        <View style={styles.bezel}>
+          <Animated.View style={restart.screen}>
+            {children}
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glow, restart.glow]} />
+          </Animated.View>
+        </View>
+        <View style={styles.chin} pointerEvents="box-none">
           <Text style={styles.brand}>CUBEIT</Text>
-          <View style={styles.grille}>
+          <View style={styles.grille} pointerEvents="none">
             {Array.from({ length: 5 }, (_, i) => (
               <View key={i} style={styles.slot} />
             ))}
           </View>
-          <View style={styles.light} />
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Restart the screen"
+            accessibilityHint="Turns the screen off and on, putting everything back in place"
+            hitSlop={10}
+            onPress={restart.run}
+            style={styles.reset}
+          >
+            <AppSymbol name="reload" size={11} color={finish.label} weight="bold" />
+            <Animated.View style={[styles.light, restart.led]} />
+          </PressableScale>
         </View>
       </View>
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.outline]} />
     </View>
   );
+}
+
+/** Timings of the screen restart, in ms: collapse to a line, to a dot, stay dark, then power back on. */
+const OFF_LINE = 150;
+const OFF_DOT = 130;
+const DARK = 650;
+const ON_LINE = 130;
+const ON_FULL = 220;
+
+/**
+ * The LED button: the LCD dies like an old screen (squashes to a bright line,
+ * then to nothing), everything is put back where it started while it's dark,
+ * and it powers back on. Not during games.
+ */
+function useScreenRestart() {
+  const world = useWorld();
+  const reduceMotion = useReduceMotion();
+  const sx = useSharedValue(1);
+  const sy = useSharedValue(1);
+  const glow = useSharedValue(0);
+  const busy = useRef(false);
+
+  // Only the device restarts: everything inside it goes back to the start; the app around it is untouched.
+  const reset = () => {
+    world.commands.resetAll();
+    getBrain()?.interrupt(rebooted);
+  };
+
+  const run = () => {
+    if (busy.current || useUi.getState().activeGame !== null) return;
+    busy.current = true;
+    feedback('select');
+    if (reduceMotion) {
+      // No collapse: just a quick fade to dark and back.
+      glow.set(withSequence(withTiming(1, { duration: 120 }), withDelay(300, withTiming(0, { duration: 160 }))));
+      setTimeout(reset, 140);
+      setTimeout(() => (busy.current = false), 620);
+      return;
+    }
+    const ease = Easing.in(Easing.cubic);
+    const out = Easing.out(Easing.cubic);
+    const darkAt = OFF_LINE + OFF_DOT;
+    const onAt = darkAt + DARK;
+    sy.set(withSequence(withTiming(0.02, { duration: OFF_LINE, easing: ease }), withDelay(OFF_DOT + DARK + ON_LINE, withTiming(1, { duration: ON_FULL, easing: out }))));
+    sx.set(withSequence(withDelay(OFF_LINE, withTiming(0.001, { duration: OFF_DOT, easing: ease })), withDelay(DARK, withTiming(1, { duration: ON_LINE, easing: out }))));
+    // The collapsing line burns bright, then fades as the picture returns.
+    glow.set(withSequence(withTiming(1, { duration: OFF_LINE }), withDelay(OFF_DOT + DARK + ON_LINE, withTiming(0, { duration: ON_FULL }))));
+    setTimeout(reset, darkAt + 60);
+    setTimeout(() => (busy.current = false), onAt + ON_LINE + ON_FULL);
+  };
+
+  const screen = useAnimatedStyle(() => ({ transform: [{ scaleX: sx.value }, { scaleY: sy.value }] }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
+  // The LED goes out with the screen and lights again as it comes back.
+  const led = useAnimatedStyle(() => ({ opacity: 0.15 + 0.85 * Math.min(sx.value, sy.value > 0.05 ? 1 : sy.value * 20) }));
+  return { run, screen, glow: glowStyle, led };
 }
 
 /** A tiny device for the Customize picker: the housing gradient around a dark screen. */
@@ -153,6 +233,9 @@ const makeStyles = (f: DeviceFinish) =>
     brand: { fontFamily: fonts.pixelBold, fontSize: 10, letterSpacing: 1.5, color: f.label },
     grille: { flexDirection: 'row', gap: 3 },
     slot: { width: 3, height: 10, borderRadius: 1.5, backgroundColor: f.screw },
+    reset: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingLeft: 4 },
+    // The bright face of the collapsing screen.
+    glow: { backgroundColor: '#E4EBD9' },
     light: {
       width: 8,
       height: 8,

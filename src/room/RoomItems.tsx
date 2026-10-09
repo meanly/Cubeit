@@ -6,6 +6,7 @@ import type { FindId } from '../content/finds';
 import type { ItemId, SlotId } from '../content/items';
 import { LcdArt } from '../lcd/LcdArt';
 import type { RoomGeometry } from '../physics/geometry';
+import { MESS_ORDER, type MessState, type TiltState } from '../physics/types';
 import type { RoomConfig } from '../state/schema';
 import { slotRect } from './items/placement';
 import { drawItem, TICKING } from './items/pixelArt';
@@ -20,10 +21,14 @@ interface LayerProps {
   /** Per-slot "poke" counters; bumping one plays that item's wiggle. */
   pokes: Record<SlotId, SharedValue<number>>;
   reduceMotion: boolean;
+  /** The phone's tilt: every item leans a little with it (`TiltState.lean`). */
+  tilt: SharedValue<TiltState>;
+  /** Shake mess: each item's knocked-about offset and twist. */
+  mess: SharedValue<MessState>;
 }
 
 /** Renders the furniture in the given slots, in order (back to front). */
-export const RoomItems = memo(function RoomItems({ g, room, slots, hour, minute, finds, pokes, reduceMotion }: LayerProps) {
+export const RoomItems = memo(function RoomItems({ g, room, slots, hour, minute, finds, pokes, reduceMotion, tilt, mess }: LayerProps) {
   return (
     <>
       {slots.map((slot) => {
@@ -41,6 +46,8 @@ export const RoomItems = memo(function RoomItems({ g, room, slots, hour, minute,
             minute={minute}
             finds={finds}
             animate={!reduceMotion}
+            tilt={tilt}
+            mess={mess}
           />
         );
       })}
@@ -68,6 +75,8 @@ function ItemView({
   minute,
   finds,
   animate,
+  tilt,
+  mess,
 }: {
   g: RoomGeometry;
   slot: Exclude<SlotId, 'toy'>;
@@ -78,6 +87,8 @@ function ItemView({
   minute: number;
   finds: readonly FindId[];
   animate: boolean;
+  tilt: SharedValue<TiltState>;
+  mess: SharedValue<MessState>;
 }) {
   const tick = useTick(TICKING[item], animate);
   const bitmap = useMemo(
@@ -99,15 +110,48 @@ function ItemView({
       );
     },
   );
-  const style = useAnimatedStyle(() => ({ transform: [{ translateX: Math.round(wiggle.value) * g.dot }] }));
+  const slotIndex = (MESS_ORDER as readonly string[]).indexOf(slot);
+  const lean = LEAN[slot];
+  // Wiggle when poked, knocked about by a shake, and lean a little with the tilt.
+  const style = useAnimatedStyle(() => {
+    const o = slotIndex * 6;
+    const m = mess.value.v;
+    const dx = slotIndex >= 0 ? m[o] : 0;
+    const dy = slotIndex >= 0 ? m[o + 1] : 0;
+    const twist = slotIndex >= 0 ? m[o + 2] : 0;
+    return {
+      transform: [
+        { translateX: (Math.round(wiggle.value) + Math.round(dx)) * g.dot },
+        { translateY: Math.round(dy) * g.dot },
+        { rotate: `${tilt.value.lean * lean + twist}rad` },
+      ],
+    };
+  });
 
   if (!bitmap) return null;
   const rect = slotRect(g, slot);
   return (
-    <Animated.View pointerEvents="none" style={[styles.item, { left: rect.left, top: rect.top }, style]}>
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.item, { left: rect.left, top: rect.top, transformOrigin: lean < 0 ? 'center top' : 'center bottom' }, style]}
+    >
       <LcdArt bitmap={bitmap} dot={g.dot} />
     </Animated.View>
   );
 }
+
+/**
+ * How far each slot leans with the tilt. Standing pieces rock on their base
+ * toward the low side (+); hung ones swing from the top, their bottom toward it
+ * (-); the string lights barely sway, and the rug lies flat.
+ */
+const LEAN: Record<Exclude<SlotId, 'toy'>, number> = {
+  rest: 0.6,
+  corner: 1,
+  rug: 0,
+  wallLeft: -1,
+  wallRight: -1,
+  ceiling: -0.25,
+};
 
 const styles = StyleSheet.create({ item: { position: 'absolute' } });

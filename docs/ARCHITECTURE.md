@@ -84,12 +84,25 @@
   worklet that stamps a skeleton onto a 32×32 dot sprite each frame;
   `CharacterRig` only feeds it shared values and places the sprite.
   The rest pose is the toy's 21-dot figure, dot for dot (a test pins it).
-  A hard sideways tilt makes that wall "down": `BodyState.rot` topples him
-  like a pole, he thuds flat and crumples head-first into the corner; if the
-  tilt keeps that wall "down" (`PHYS.wallOn`), he rolls over onto his feet and
-  stands on the wall (`BodyState.wall`, rot ±3π/2), with his speech bubble and
-  emotes turned to match (`CharacterOverlay`). Easing the tilt (`wallOff`)
-  pivots him back onto the floor.
+- **Gravity & tilt**: a tilt slides the stickman toward the low side like a
+  marble (leaning back against it, his walking overpowered) and rolls the
+  ball. Tilted far enough, `stepTilt` snaps his "down" to that side of the
+  phone (`TiltState.side`: floor, left, top, right, with hysteresis) and eases
+  `TiltState.angle` toward it: gravity carries him there and he stands on that
+  wall (feet on the border) — or on the top edge when the phone is upside
+  down. Furniture never moves or turns with the tilt: it stays on its base and
+  only leans a little (`TiltState.lean`, up to `PHYS.itemLean`); standing
+  pieces rock on their bottom edge, hung ones swing from the top (`LEAN` in
+  `RoomItems`). Games keep "down" on the floor (`params.orientLocked`).
+- **Shaking**: accelerometer jolts — sharp swings between two readings,
+  measured in g against the gravity sensor (X in the web preview) — build up
+  `TiltState.shake`; past 1 everything is knocked out of place (`scatter`):
+  furniture gets offsets and twists (`MessState`) that ease home after a few
+  seconds, the ball and stickman are flung by their own physics.
+- **Device restart**: the orange LED on the device (with a reload icon) powers
+  the screen down like an old LCD and back up; while it's dark everything
+  inside the device goes back to its start (`commands.resetAll`). The app
+  around it is untouched.
   Knocks read through the whole body: the physics keeps a `recoil` spring
   (driven by every velocity change, kicked by wall hits) and a decaying
   `flail`, which the sprite spreads across hips, chest, head, arms and knees.

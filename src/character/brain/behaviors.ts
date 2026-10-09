@@ -336,6 +336,17 @@ export function reactDizzy(lines: readonly string[]): Behavior {
   });
 }
 
+/** After the device's reset button: everything is back in place and he starts afresh. */
+export const rebooted = behavior('rebooted', async (ctx) => {
+  const { brain } = ctx;
+  brain.world.commands.stop();
+  brain.setState('surprised');
+  await ctx.wait(900);
+  brain.setState('idle');
+  if (brain.env.rng() < 0.7) brain.say(pick(LINES.rebooted), 1600);
+  await ctx.wait(1200);
+});
+
 export const slide = behavior('slide', async (ctx) => {
   const { brain } = ctx;
   const { character, mood } = useGame.getState();

@@ -141,35 +141,20 @@ describe('pixel stickman', () => {
       for (let c = 0; c < GRID; c++) expect(grid[r * GRID + c] !== 0).toBe(grid[r * GRID + (GRID - 1 - c)] !== 0);
   });
 
-  it('lies down to sleep and when knocked over by a tilt', () => {
+  it('lies down on its side to sleep', () => {
     const sleep = bounds(draw({ state: stateCode('sleeping') }).grid);
     expect(sleep.w).toBeGreaterThan(sleep.h);
-    const fallen = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI / 2 }).grid);
-    expect(fallen.w).toBeGreaterThan(fallen.h * 2);
   });
 
-  it('stands on a wall as the whole upright figure turned a quarter (not squashed like lying)', () => {
-    const lying = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI / 2, motion: 0.35 }).grid);
-    const onWall = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI * 1.5, wall: 1, motion: 0.35 }).grid);
-    expect(onWall.w).toBeGreaterThanOrEqual(20);
-    // Exactly as thick as the standing figure is wide, and thicker than the edge-on lying one.
-    expect(onWall.h).toBe(bounds(rasterStickman(IDLE_INPUT).grid).w);
-    expect(onWall.h).toBeGreaterThan(lying.h);
-  });
-
-  it('topples through every angle, and lies head-down in a corner past flat', () => {
-    const headCol = (rot: number) => {
-      const { grid } = draw({ fallen: 1, fallDir: 1, rot, motion: 0.35 });
-      return bounds(grid);
-    };
-    // Tipping right: the figure leans further right and gets lower as it goes.
-    const steps = [0.2, 0.6, 1.0, Math.PI / 2].map(headCol);
-    for (let i = 1; i < steps.length; i++) {
-      expect(steps[i].right).toBeGreaterThanOrEqual(steps[i - 1].right);
-      expect(steps[i].h).toBeLessThan(steps[i - 1].h);
-    }
-    // Past flat (head jammed into the corner) it rises up off the floor again.
-    expect(headCol(Math.PI * 0.75).h).toBeGreaterThan(steps[3].h);
+  it('turns with the room: on its side it lies along the floor (not floating), full width', () => {
+    const turned = bounds(draw({ rot: Math.PI / 2, motion: 0.35 }).grid);
+    // The whole standing figure, a quarter turn round: 21 long, as thick as it is wide…
+    expect(turned.w).toBeGreaterThanOrEqual(20);
+    expect(turned.h).toBeGreaterThanOrEqual(bounds(rasterStickman(IDLE_INPUT).grid).w - 1);
+    // …resting on the bottom row.
+    expect(turned.bottom).toBe(GRID - 1);
+    // Upside down it keeps its full height.
+    expect(bounds(draw({ rot: Math.PI, motion: 0.35 }).grid).h).toBe(21);
   });
 
   it('keeps its hands inside a nearby wall', () => {

@@ -129,6 +129,7 @@ export function StarCatch({ g }: { g: RoomGeometry }) {
       running.set(on ? 1 : 0);
       frame.setActive(on);
       world.mode.set(on ? 1 : 3);
+      // Star Catch makes him nimbler (tilting carries him, as it always does).
       params.set({ ...params.value, speedBoost: on ? 2.8 : 1 });
     };
     const end = () => {

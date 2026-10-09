@@ -60,7 +60,7 @@ export function Onboarding() {
           <View style={styles.body}>
             <Text style={styles.title}>Say hi to {finalName}!</Text>
             <Tip n={1} text={`Tap ${finalName} to say hi. Hold to pet. Drag to pick them up.`} />
-            <Tip n={2} text="Tilt your phone and they'll tumble around the room. You can turn this off in Settings." />
+            <Tip n={2} text="Tilt your phone and they slide that way. Tip it right over and they stand on that side. Shake it and things go flying! You can turn this off in Settings." />
             <Tip n={3} text="Play, decorate, talk and keep memories from the home screen." />
             <Text style={styles.privacy}>Everything stays on this device. No account, no internet needed.</Text>
             <Next label="Let's go" onPress={finish} />

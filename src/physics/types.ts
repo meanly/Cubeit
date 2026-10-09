@@ -31,29 +31,14 @@ export interface BodyState {
   recoilV: number;
   /** 0..1, set by hard knocks and decaying: arms fly out, knees buckle, feet stagger. */
   flail: number;
-  /** > 0 while knocked over by a hard tilt (counts down to getting up); head toward fallDir. */
-  fallen: number;
-  fallDir: number;
   /**
-   * Whole-body rotation in radians (+ = head toward +x) and its speed. Knocked
-   * over, he topples like a pole to π/2 (flat), past it head-first into the
-   * corner while the tilt keeps that wall "down", and springs back up after.
+   * Whole-body rotation in radians, for drawing (+ = clockwise, head toward +x):
+   * which way is "down" for him (TiltState.angle — standing on a side wall it's
+   * ±π/2) plus `messRot`, a springy spin from being knocked about by a shake.
    */
   rot: number;
-  rotV: number;
-  /**
-   * Standing on a side wall (-1 left, 1 right, 0 no): a held hard tilt makes
-   * that wall the floor, so once he's settled in the corner he rolls over onto
-   * his feet against it (rot ±3π/2). `wallBlend` eases 0..1 for the drawing,
-   * `wallT` times how long he's been settled in the corner.
-   */
-  wall: number;
-  wallBlend: number;
-  wallT: number;
-  /** The screen is tipped over so far that gravity pulls toward its top edge. */
-  gUp: number;
-  /** Lying pressed against the ceiling. */
-  onCeil: number;
+  messRot: number;
+  messRotV: number;
 
   // Control (set by commands)
   hasTarget: number;
@@ -106,9 +91,48 @@ export interface TiltState {
   /** Filtered, calibrated tilt, -1..1 per axis. */
   x: number;
   z: number;
+  /**
+   * Which side of the room is "down" for the stickman: 0 the floor, 1 the left
+   * wall, 2 the ceiling (screen upside down), 3 the right wall. He falls to it
+   * and stands on it; the furniture stays put.
+   */
+  side: number;
+  /** The stickman's orientation in radians (eased toward the side's angle), and its speed. */
+  angle: number;
+  angleV: number;
+  /**
+   * 1 while the phone is tilted at all (or a side is down), with `quietFor`
+   * timing how long it's been level before that ends.
+   */
   active: number;
   quietFor: number;
+  /** Furniture lean in radians (+ = toward +x), springing after the sideways tilt, and its speed. */
+  lean: number;
+  leanV: number;
+  /** Sensor jolts since the last step (from the accelerometer, or the web's shake key). */
+  jolt: number;
+  /** Accumulated shaking; past 1 the room gets messy. */
+  shake: number;
+  messCooldown: number;
+  /** Set for one step when the room should be scattered (the frame loop consumes it). */
+  messNow: number;
 }
+
+/**
+ * Furniture knocked out of place by a shake, per slot (MESS_ORDER): offset x,
+ * y (dots) and twist r (radians), then their targets. `hold` counts down the
+ * seconds before everything eases home.
+ */
+export interface MessState {
+  hold: number;
+  v: number[];
+}
+
+/** The furniture slots that can be knocked about, in MessState order. */
+export const MESS_ORDER = ['rest', 'corner', 'wallLeft', 'wallRight', 'rug', 'ceiling'] as const;
+export const MESS_SLOTS = MESS_ORDER.length;
+
+export const initialMess = (): MessState => ({ hold: 0, v: new Array(MESS_SLOTS * 6).fill(0) });
 
 export interface PhysicsParams {
   tiltEnabled: number;
@@ -120,6 +144,8 @@ export interface PhysicsParams {
   reduceMotion: number;
   /** Multiplier on walking speed (games make the character nimbler). */
   speedBoost: number;
+  /** 1 keeps "down" on the floor (games), whatever way the phone is held: tilting only slides things. */
+  orientLocked: number;
 }
 
 /** Event codes sent from the UI-thread simulation to JS (numbers cross threads cheaply). */
@@ -128,10 +154,15 @@ export const PhysicsEvent = {
   Bump: 1,
   Land: 2,
   Arrive: 3,
+  /**
+   * The phone started tilting, or "down" moved to another side (a = side, b =
+   * previous); TiltEnd once it's level again with the floor down.
+   */
   TiltStart: 4,
   TiltEnd: 5,
   BallHit: 6,
-  Dislodged: 7,
+  /** Shaken too hard: everything was knocked out of place. */
+  MessUp: 7,
 } as const;
 export type PhysicsEventCode = (typeof PhysicsEvent)[keyof typeof PhysicsEvent];
 
@@ -153,15 +184,9 @@ export function initialBody(x: number, z: number): BodyState {
     recoil: 0,
     recoilV: 0,
     flail: 0,
-    fallen: 0,
-    fallDir: 1,
     rot: 0,
-    rotV: 0,
-    wall: 0,
-    wallBlend: 0,
-    wallT: 0,
-    gUp: 0,
-    onCeil: 0,
+    messRot: 0,
+    messRotV: 0,
     hasTarget: 0,
     tx: x,
     tz: z,
@@ -207,6 +232,15 @@ export const initialTilt = (): TiltState => ({
   autoValid: 0,
   x: 0,
   z: 0,
+  side: 0,
+  angle: 0,
+  angleV: 0,
   active: 0,
   quietFor: 0,
+  lean: 0,
+  leanV: 0,
+  jolt: 0,
+  shake: 0,
+  messCooldown: 0,
+  messNow: 0,
 });

@@ -43,9 +43,8 @@ export const BumpFx = memo(function BumpFx({ world, g }: { world: World; g: Room
         const body = world.body.value;
         const col = projectX(gg, body.x, body.z) / gg.dot;
         const feet = projectY(gg, body.z, body.y) / gg.dot;
-        const lying = body.fallen > 0;
-        // Where the body meets the wall: the head/chest when standing, the side when lying.
-        const mid = lying ? feet - 3 : feet - WORLD.charHeight * 60 * 0.75;
+        // Where the body meets the wall: about chest height.
+        const mid = feet - WORLD.charHeight * 60 * 0.75;
         let item: Omit<Fx, 'id'> | null = null;
         if (code === PhysicsEvent.Bump && b === 0) item = { kind: 'left', x: 0, y: mid - 4 };
         else if (code === PhysicsEvent.Bump && b === 1) item = { kind: 'right', x: 60 - 7, y: mid - 4 };

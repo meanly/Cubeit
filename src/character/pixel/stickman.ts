@@ -71,6 +71,18 @@ const LEG_W = 2;
 /** Lying on its side the figure is seen edge-on, this much narrower. */
 const SIDE_SQUISH = 0.45;
 
+/**
+ * How far the standing figure, turned by `rot` about its middle, drops so its
+ * lowest point rests on the floor (dots) — so turned onto his side he lies
+ * along the floor against the border instead of hanging in mid-air.
+ */
+export function turnDrop(rot: number): number {
+  'worklet';
+  const mid = HEAD_TOP_U / 2;
+  const lowest = mid - mid * Math.abs(Math.cos(rot)) - 6 * Math.abs(Math.sin(rot));
+  return Math.max(0, lowest);
+}
+
 const STATE_ORDER: readonly CharacterState[] = [
   'idle',
   'walking',
@@ -148,16 +160,11 @@ export interface StickmanInput {
   vy: number;
   squash: number;
   lean: number;
-  /** 1 = knocked over by tilt (flailing, head toward fallDir). */
-  fallen: number;
-  fallDir: number;
   /**
-   * Whole-figure rotation in radians from the physics (BodyState.rot):
-   * + tips the head toward +x. π/2 is lying flat; past it, head-down into a corner.
+   * Whole-figure turn in radians (BodyState.rot: which side is "down" for him plus
+   * any shake spin), + clockwise. The figure turns in place about its middle.
    */
   rot: number;
-  /** 0..1: standing on a side wall (BodyState.wallBlend) — a normal standing pose, just turned. */
-  wall: number;
   // room edges, in dots from the body's center line / up from its feet
   roomL: number;
   roomR: number;
@@ -206,10 +213,7 @@ export const IDLE_INPUT: StickmanInput = {
   vy: 0,
   squash: 0,
   lean: 0,
-  fallen: 0,
-  fallDir: 1,
   rot: 0,
-  wall: 0,
   roomL: 99,
   roomR: 99,
   roomT: 99,
@@ -428,8 +432,9 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   let lift = Math.abs(Math.sin(t * 7)) * p.bounce * 2.4 * m;
   let headDX = Math.round(Math.max(-1, Math.min(1, p.tilt * 8 + p.lookX)));
   let headDU = 0;
-  // Whole-figure rotation (falls come from the physics, sleeping lies on its side).
-  let rot = p.fallen === 1 ? p.rot : 0;
+  // Sleeping lies on its side (a quarter turn, resting on the floor); the room's
+  // orientation then turns the whole figure in place.
+  let lieRot = 0;
   // Walking is drawn in profile: limbs swing toward/away from `facing`.
   let swingL = NaN;
   let swingR = NaN;
@@ -443,19 +448,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
 
   bendR += p.wave * Math.sin(tq * 11) * 0.4;
 
-  // Standing on a wall counts as standing: the usual poses, just rotated.
-  const onWall = p.wall >= 0.5;
-  const tumbling = p.fallen === 1 && !onWall;
-  if (tumbling) {
-    // Knocked over by the tilt: arms thrown up and flapping, legs kicking.
-    armL = 1.5 + Math.sin(tq * 14) * 0.4 * m;
-    armR = 1.5 - Math.sin(tq * 14) * 0.4 * m;
-    bendL = Math.sin(tq * 11) * 0.5 * m;
-    bendR = -bendL;
-    spread = 2;
-    footLU += Math.max(0, Math.sin(tq * 9)) * 1.5 * m;
-    footRU += Math.max(0, -Math.sin(tq * 9)) * 1.5 * m;
-  } else if (walking) {
+  if (walking) {
     // 8 frames per stride, side view.
     const ph = (Math.floor((p.walkPhase / (Math.PI * 2)) * 8) / 8) * Math.PI * 2;
     const s = Math.sin(ph);
@@ -483,7 +476,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   }
 
   const beat = Math.floor(t * 2.5);
-  if (!tumbling) {
+  {
     switch (st) {
       case S_LOOK:
         headDX = Math.round(Math.sin(tq * 1.7) * 1.3);
@@ -522,7 +515,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
         break;
       case S_SLEEPING:
         // Lying on its side, arms along the body, knees a little bent.
-        rot = (p.facing >= 0 ? 1 : -1) * (Math.PI / 2);
+        lieRot = (p.facing >= 0 ? 1 : -1) * (Math.PI / 2);
         crouch = 0.2;
         spread = 1;
         armL = -0.55;
@@ -602,7 +595,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
 
   // Idle fidgets: every few seconds, a short, randomly chosen bit of business.
   const settled = Math.abs(p.armL) + Math.abs(p.armR) + p.bounce + p.lower < 0.1;
-  if (st === S_IDLE && grounded && !walking && lively && settled && !tumbling) {
+  if (st === S_IDLE && grounded && !walking && lively && settled) {
     const period = 5.5 + rand(p.seed + 3) * 2;
     const at = t + p.seed * 1.7;
     const k = Math.floor(at / period);
@@ -651,9 +644,11 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   const rc = Math.max(-1.3, Math.min(1.3, p.recoil)) * m;
   const fl = Math.max(0, Math.min(1, p.flail)) * m;
   const jit = Math.sin(tq * 23 + p.seed * 5);
-  const lie = Math.abs(rot) > Math.PI / 4 && !onWall;
-  const lieDir = rot >= 0 ? 1 : -1;
-  const upright = Math.abs(rot) < 0.05;
+  const lie = lieRot !== 0;
+  const lieDir = lieRot >= 0 ? 1 : -1;
+  const turn = p.rot;
+  const rot = lieRot + turn;
+  const upright = !lie && Math.abs(turn) < 0.05;
   if (lie) {
     // Lying down the jolt runs along the body: the head and chest shove
     // toward the wall and spring back, the knees fold up.
@@ -753,7 +748,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     const sh = side < 0 ? SH_L : SH_R;
     const el = side < 0 ? ELB_L : ELB_R;
     const hd = side < 0 ? HAND_L : HAND_R;
-    const shrug = Math.max(0, Math.min(1.5, (pt[hd + 1] - pt[sh + 1] + 1) * 0.4)) * (lively || p.fallen === 1 ? 1 : 0.6);
+    const shrug = Math.max(0, Math.min(1.5, (pt[hd + 1] - pt[sh + 1] + 1) * 0.4)) * (lively ? 1 : 0.6);
     if (shrug > 0) {
       const dx = -side * shrug * 0.3;
       pt[sh] += dx;
@@ -806,31 +801,46 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   solve(pt, HIP_L, KNEE_L, FOOT_L, clampFoot(-spread + footLX), 0.5 + footLU, THIGH, SHIN, kneeSide || -1);
   solve(pt, HIP_R, KNEE_R, FOOT_R, clampFoot(spread + footRX), 0.5 + footRU, THIGH, SHIN, kneeSide || 1);
 
-  // ── Spin (mirror + narrow side view) and tipping over ──
+  // ── Spin (mirror + narrow side view), lying down, and turning with the room ──
   const c = Math.cos(p.spin * Math.PI * 4);
   const mx = (c < 0 ? -1 : 1) * (Math.abs(c) < 0.45 ? 0.35 : 1);
   if (upright) {
     for (let i = 0; i < POINTS; i += 2) pt[i] *= mx;
   } else {
-    // Rotate the whole figure about its middle, seen more edge-on the further
-    // it tips, then drop it so its lowest point rests on the floor.
-    const sn = Math.sin(rot);
-    const cs = Math.cos(rot);
-    // Lying, he's seen edge-on; standing on a wall he faces us as usual.
-    const squish = mx * (1 - SIDE_SQUISH * Math.min(1, Math.abs(sn)) * (1 - Math.min(1, p.wall)));
-    const pivot = HEAD_TOP_U / 2;
-    let minU = Infinity;
-    for (let i = 0; i < POINTS; i += 2) {
-      const x = pt[i] * squish;
-      const u = pt[i + 1] - pivot;
-      pt[i] = x * cs + u * sn;
-      pt[i + 1] = -x * sn + u * cs + pivot;
-      minU = Math.min(minU, pt[i + 1]);
+    let pivot = HEAD_TOP_U / 2;
+    if (lie) {
+      // Asleep: a quarter turn onto his side, seen edge-on, resting on the floor.
+      const sn = Math.sin(lieRot);
+      const cs = Math.cos(lieRot);
+      const squish = mx * (1 - SIDE_SQUISH);
+      let minU = Infinity;
+      for (let i = 0; i < POINTS; i += 2) {
+        const x = pt[i] * squish;
+        const u = pt[i + 1] - pivot;
+        pt[i] = x * cs + u * sn;
+        pt[i + 1] = -x * sn + u * cs + pivot;
+        minU = Math.min(minU, pt[i + 1]);
+      }
+      minU = Math.min(minU, pt[HEAD + 1] - 2 + 0.5);
+      const drop = 0.5 - minU;
+      for (let i = 1; i < POINTS; i += 2) pt[i] += drop;
+      pivot = 2.5;
+    } else {
+      for (let i = 0; i < POINTS; i += 2) pt[i] *= mx;
     }
-    // The head (2 dots past its center) can be the lowest part when head-down.
-    minU = Math.min(minU, pt[HEAD + 1] - 2 * Math.max(Math.abs(cs), Math.abs(sn)) + 0.5);
-    const drop = 0.5 - minU;
-    for (let i = 1; i < POINTS; i += 2) pt[i] += drop;
+    if (Math.abs(turn) > 0.0005) {
+      // Standing on a wall (or the ceiling): spin the whole figure about its middle, then let it
+      // settle onto the floor (gravity has already pushed him against the border).
+      const sn = Math.sin(turn);
+      const cs = Math.cos(turn);
+      const drop = lie ? 0 : turnDrop(turn);
+      for (let i = 0; i < POINTS; i += 2) {
+        const x = pt[i];
+        const u = pt[i + 1] - pivot;
+        pt[i] = x * cs + u * sn;
+        pt[i + 1] = -x * sn + u * cs + pivot - drop;
+      }
+    }
   }
 
   // ── Rasterize ──

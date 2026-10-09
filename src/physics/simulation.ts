@@ -1,11 +1,12 @@
 import { ceilingY, depthScale, floorY, unprojectFloor, WORLD, type RoomGeometry } from './geometry';
-import { PhysicsEvent, type BallState, type BodyState, type PhysicsParams, type TiltState } from './types';
+import { MESS_SLOTS, PhysicsEvent, type BallState, type BodyState, type MessState, type PhysicsParams, type TiltState } from './types';
 
 /**
  * Tuning for the character's "weight". Units: world units (room width = 1)
  * and seconds. Kept together so feel can be tuned in one place.
  */
 export const PHYS = {
+  /** Tilting slides the stickman (and rolls the ball) toward the low side, like a marble. */
   tiltAccel: 4.2,
   tiltDepthAccel: 3.4,
   friction: 2.6,
@@ -17,21 +18,40 @@ export const PHYS = {
   landThreshold: 0.9,
   deadzone: 0.035,
   filterTau: 0.08,
-  tiltOn: 0.2,
-  tiltOff: 0.1,
-  tiltQuietSec: 0.8,
-  dislodgeTilt: 0.45,
   ballTiltAccel: 5.2,
   ballFriction: 0.9,
   ballRestitution: 0.7,
   ballFloorBounce: 0.5,
   charRadius: 0.085,
-  /** Sideways tilt that knocks the stickman over, and the calmer tilt at which he gets back up. */
-  fallOn: 0.5,
-  fallOff: 0.25,
-  /** Tipping the screen's top edge down this far flips gravity toward the ceiling (and back below flipOff). */
-  flipOn: 0.6,
-  flipOff: 0.35,
+  /** Tilting counts as started above `tiltOn`, and over once below `tiltOff` for `tiltQuietSec`. */
+  tiltOn: 0.2,
+  tiltOff: 0.1,
+  tiltQuietSec: 0.8,
+  /**
+   * The stickman's gravity snaps to whichever side of the phone is down: a side
+   * takes over once its tilt passes `sideOn` and lets go below `sideOff` (top
+   * edge: `upOn` / `upOff`).
+   */
+  sideOn: 0.6,
+  sideOff: 0.4,
+  upOn: 0.6,
+  upOff: 0.35,
+  /** He turns to the new "down" on an eased spring (slightly underdamped). */
+  orientK: 80,
+  orientDamp: 13,
+  /**
+   * Furniture stays standing on its base and only leans with a sideways tilt:
+   * up to `itemLean` radians, on a wobbly spring.
+   */
+  itemLean: 0.12,
+  leanK: 60,
+  leanDamp: 6,
+  /** Shaking: each jolt adds this much "shake"; it drains at `shakeDrain`/s, and past 1 the room gets messy. */
+  joltShake: 0.34,
+  shakeDrain: 1.1,
+  messCooldown: 1.5,
+  /** How long things stay knocked out of place before they ease back. */
+  messHold: 3.2,
   /** Whole-body recoil spring: stiffness, damping (underdamped, so it wobbles back), */
   recoilK: 120,
   recoilDamp: 5.5,
@@ -42,23 +62,10 @@ export const PHYS = {
   /** Impact speed above which the stickman is knocked off his feet and flails. */
   knockHop: 0.9,
   flailDecay: 1.5,
-  /** Toppling: angular pull while falling over (grows as he tips, like a pole), */
-  topple: 7,
-  toppleGrow: 16,
-  /** the springy get-up / settle, */
-  rotK: 70,
-  rotDamp: 13,
-  /** how far past flat he crumples head-first into the corner (radians), */
-  cornerTip: Math.PI / 4,
-  /** and the extra pull toward the wall a hard sideways tilt adds while he's down. */
-  sideGravity: 5,
-  lyingFriction: 1.1,
-  /** Standing on a side wall: how long he stays crumpled in the corner first, */
-  wallStandAfter: 0.7,
-  /** the sideways tilt that keeps the wall "down" (enter above `wallOn`, leave below `wallOff`), */
-  wallOn: 0.78,
-  wallOff: 0.45,
 } as const;
+
+/** Rotation for each gravity side: down, left edge down, top edge down, right edge down. */
+const SIDE_ANGLE = [0, Math.PI / 2, Math.PI, -Math.PI / 2] as const;
 
 function clamp(v: number, lo: number, hi: number): number {
   'worklet';
@@ -74,10 +81,13 @@ export function shapeTilt(v: number, deadzone: number): number {
 }
 
 /**
- * Turn raw gravity into a smoothed, calibrated tilt vector.
- * Gravity points toward the ground in device coordinates (Reanimated reports
- * the same convention on iOS and Android), so lowering the left edge makes
- * x negative and the character slides left — like a marble.
+ * Turn raw gravity into a smoothed, calibrated tilt vector, decide which side
+ * of the room is "down" for the stickman and ease his orientation toward it,
+ * and spring the furniture's lean after it. Gravity points toward the ground in
+ * device coordinates (Reanimated reports the same convention on iOS and
+ * Android), so lowering the left edge makes x negative and things slide left.
+ * Also turns sensor jolts into shake, and flags a mess (`messNow`) when the
+ * phone has been shaken too hard.
  */
 export function stepTilt(t: TiltState, p: PhysicsParams, dt: number, events: number[]): void {
   'worklet';
@@ -99,22 +109,134 @@ export function stepTilt(t: TiltState, p: PhysicsParams, dt: number, events: num
   t.x += (clamp(tx, -1.5, 1.5) - t.x) * a;
   t.z += (clamp(tz, -1.5, 1.5) - t.z) * a;
 
+  // Which side is down? Hold the current side while its tilt stays past the
+  // release threshold, otherwise take whichever side is past the entry threshold.
+  // (Games keep the floor down: their controls assume it.)
+  const prev = t.side;
+  let side = 0;
+  if (p.tiltEnabled === 1 && p.orientLocked === 0) {
+    const holds = prev === 1 ? t.x < -PHYS.sideOff : prev === 3 ? t.x > PHYS.sideOff : prev === 2 ? t.z > PHYS.upOff : false;
+    if (holds) side = prev;
+    else if (t.x <= -PHYS.sideOn) side = 1;
+    else if (t.x >= PHYS.sideOn) side = 3;
+    else if (t.z >= PHYS.upOn) side = 2;
+  }
+  t.side = side;
+
+  // Tilting started (any noticeable tilt, or a new side down) / ended (level for a moment, floor down).
   const mag = Math.hypot(t.x, t.z);
-  if (t.active === 0) {
+  if (side !== prev && side !== 0) {
+    t.active = 1;
+    t.quietFor = 0;
+    events.push(PhysicsEvent.TiltStart, side, prev);
+  } else if (t.active === 0) {
     if (mag > PHYS.tiltOn) {
       t.active = 1;
       t.quietFor = 0;
-      events.push(PhysicsEvent.TiltStart, mag, 0);
+      events.push(PhysicsEvent.TiltStart, side, prev);
     }
-  } else if (mag < PHYS.tiltOff) {
+  } else if (side === 0 && mag < PHYS.tiltOff) {
     t.quietFor += dt;
     if (t.quietFor > PHYS.tiltQuietSec) {
       t.active = 0;
-      events.push(PhysicsEvent.TiltEnd, 0, 0);
+      events.push(PhysicsEvent.TiltEnd, 0, prev);
     }
   } else {
     t.quietFor = 0;
   }
+
+  // Furniture leans a little toward the low side, rocking on its base.
+  const leanTarget = p.tiltEnabled === 1 && p.orientLocked === 0 ? clamp(t.x, -1, 1) * PHYS.itemLean : 0;
+  t.leanV += ((leanTarget - t.lean) * PHYS.leanK - t.leanV * PHYS.leanDamp) * dt;
+  t.lean += t.leanV * dt;
+
+  // Ease toward the side's angle, taking the short way round.
+  let target = SIDE_ANGLE[t.side];
+  while (target - t.angle > Math.PI) target -= Math.PI * 2;
+  while (target - t.angle < -Math.PI) target += Math.PI * 2;
+  t.angleV += ((target - t.angle) * PHYS.orientK - t.angleV * PHYS.orientDamp) * dt;
+  t.angle += t.angleV * dt;
+  if (Math.abs(target - t.angle) < 0.001 && Math.abs(t.angleV) < 0.01) {
+    t.angle = SIDE_ANGLE[t.side];
+    t.angleV = 0;
+  }
+
+  // Shaking: jolts pile up faster than they drain only when the phone is really shaken.
+  t.shake = Math.max(0, t.shake - dt * PHYS.shakeDrain) + t.jolt * PHYS.joltShake;
+  t.jolt = 0;
+  t.messCooldown = Math.max(0, t.messCooldown - dt);
+  if (t.shake > 1 && t.messCooldown === 0) {
+    t.messNow = 1;
+    t.shake = 0.3;
+    t.messCooldown = PHYS.messCooldown;
+    events.push(PhysicsEvent.MessUp, 1, 0);
+  }
+}
+
+/** Random in [-1, 1], but at least `min` in size. */
+function kickRand(min: number): number {
+  'worklet';
+  const r = Math.random() * 2 - 1;
+  return Math.sign(r || 1) * (min + (1 - min) * Math.abs(r));
+}
+
+/**
+ * Shaken too hard: every object is knocked out of place. Furniture gets a
+ * random offset (in dots) and twist that holds for a few seconds before it
+ * eases home; the ball and the stickman are flung by their own physics.
+ */
+export function scatter(mess: MessState, b: BodyState, ball: BallState, reduceMotion: number): void {
+  'worklet';
+  const k = reduceMotion === 1 ? 0.35 : 1;
+  mess.hold = PHYS.messHold;
+  for (let i = 0; i < MESS_SLOTS; i++) {
+    const o = i * 6;
+    mess.v[o + 3] = kickRand(0.3) * 6 * k;
+    mess.v[o + 4] = kickRand(0.2) * 4 * k;
+    mess.v[o + 5] = kickRand(0.3) * 0.7 * k;
+  }
+  if (b.held === 0 && b.frozen === 0) {
+    b.anchored = 0;
+    b.zMax = WORLD.zMax;
+    b.hasTarget = 0;
+    b.chase = 0;
+    b.vx += kickRand(0.4) * 1.2 * k;
+    b.vz += kickRand(0) * 0.5 * k;
+    b.vy = Math.max(b.vy, 1.1 * k);
+    b.y = Math.max(b.y, 0.001);
+    b.messRotV += kickRand(0.5) * 9 * k;
+    b.flail = 1;
+  }
+  if (ball.present === 1) {
+    ball.vx += kickRand(0.4) * 1.6 * k;
+    ball.vz += kickRand(0) * 0.6 * k;
+    ball.vy += 1.4 * k;
+    ball.y = Math.max(ball.y, 0.001);
+  }
+}
+
+/** Furniture offsets: spring toward their knocked-about targets while the mess holds, then home. */
+export function stepMess(mess: MessState, dt: number): void {
+  'worklet';
+  mess.hold = Math.max(0, mess.hold - dt);
+  const holding = mess.hold > 0;
+  for (let i = 0; i < MESS_SLOTS; i++) {
+    const o = i * 6;
+    for (let c = 0; c < 3; c++) {
+      const target = holding ? mess.v[o + 3 + c] : 0;
+      const pos = mess.v[o + c];
+      // Velocity is implicit: a critically-damped ease (no overshoot through walls).
+      const rate = holding ? 14 : 4;
+      mess.v[o + c] = pos + (target - pos) * Math.min(1, dt * rate);
+    }
+  }
+}
+
+/** Put every object back where it belongs at once (the LED reset). */
+export function clearMess(mess: MessState): void {
+  'worklet';
+  mess.hold = 0;
+  for (let i = 0; i < mess.v.length; i++) mess.v[i] = 0;
 }
 
 /** Character being dragged: follow the finger in the plane of the screen. */
@@ -147,14 +269,6 @@ function stepHeld(b: BodyState, g: RoomGeometry, dt: number): void {
   b.z = nz;
   b.speed = 0;
   b.walking = 0;
-  b.fallen = 0;
-  // Picked up, he's righted at once.
-  b.rot = 0;
-  b.rotV = 0;
-  b.wall = 0;
-  b.wallBlend = 0;
-  b.wallT = 0;
-  b.onCeil = 0;
   b.lean += (clamp(-b.vx * 0.25, -0.35, 0.35) - b.lean) * Math.min(1, dt * 10);
 }
 
@@ -196,54 +310,19 @@ export function bodyHalfX(rot: number): number {
 }
 
 /**
- * Whole-body rotation. Knocked over, he topples toward `target` like a pole
- * (slow at first, faster as he tips), thuds and bounces when he lands, and
- * springs back otherwise (settling out of the corner, getting up).
+ * The stickman turns to whichever side is "down" (TiltState.angle), so he
+ * stands on that wall, plus a springy spin when he's been knocked about by a
+ * shake. Tucked in on the furniture he stays level with it.
  */
-function stepRot(
-  b: BodyState,
-  target: number,
-  dt: number,
-  now: number,
-  events: number[],
-  reduceMotion: number,
-  deliberate: boolean,
-): void {
+function stepTurn(b: BodyState, t: TiltState, dt: number): void {
   'worklet';
-  const err = target - b.rot;
-  // A deliberate move (rolling onto the wall) is the controlled spring, never a free fall.
-  const toppling = !deliberate && target !== 0 && Math.abs(target) > Math.abs(b.rot) + 0.01;
-  if (toppling) {
-    const dir = err > 0 ? 1 : -1;
-    const before = Math.abs(b.rot);
-    b.rotV += dir * (PHYS.topple + PHYS.toppleGrow * Math.abs(Math.sin(b.rot))) * dt;
-    b.rot += b.rotV * dt;
-    const impact = Math.abs(b.rotV);
-    const landed = (target - b.rot) * dir <= 0;
-    // Thud as his body slaps flat on the floor (or into the corner).
-    if ((landed || (before < Math.PI / 2 && Math.abs(b.rot) >= Math.PI / 2)) && impact > 2.5 && now - b.lastLandAt > 0.25) {
-      b.lastLandAt = now;
-      events.push(PhysicsEvent.Land, impact * 0.3, 0);
-      if (reduceMotion === 0) {
-        b.squashV += impact * 0.6;
-        knock(b, impact * 0.12);
-        b.recoilV += -dir * impact * 0.8;
-      }
-    }
-    if (landed) {
-      // Bounce a little off the floor / wall; a gentle landing just comes to rest
-      // (otherwise long frames keep it micro-bouncing and it never settles).
-      b.rot = target;
-      b.rotV = impact > 1.5 ? -b.rotV * 0.28 : 0;
-    }
-  } else {
-    b.rotV += (err * PHYS.rotK - b.rotV * PHYS.rotDamp) * dt;
-    b.rot += b.rotV * dt;
-    if (Math.abs(err) < 0.002 && Math.abs(b.rotV) < 0.05) {
-      b.rot = target;
-      b.rotV = 0;
-    }
-  }
+  const turn = b.rot - b.messRot;
+  let d = (b.anchored === 1 ? 0 : t.angle) - turn;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  b.messRotV += (-b.messRot * 60 - b.messRotV * 7) * dt;
+  b.messRot += b.messRotV * dt;
+  b.rot = turn + d * Math.min(1, dt * 12) + b.messRot;
 }
 
 export function stepBody(
@@ -256,6 +335,7 @@ export function stepBody(
   events: number[],
 ): void {
   'worklet';
+  stepTurn(b, t, dt);
   if (b.frozen === 1) {
     b.vx = 0;
     b.vz = 0;
@@ -274,64 +354,37 @@ export function stepBody(
     return;
   }
 
-  const tiltMag = Math.hypot(t.x, t.z);
-
-  // Gravity follows the device, like a Cube World toy: tip the screen's top
-  // edge down far enough and the stickman falls up to the ceiling; tilt hard
-  // sideways and he's knocked over and slides head-first into the wall.
-  if (p.tiltEnabled === 1 && b.gUp === 0 && t.z > PHYS.flipOn) b.gUp = 1;
-  else if (b.gUp === 1 && (p.tiltEnabled === 0 || t.z < PHYS.flipOff)) b.gUp = 0;
-  const knocked = b.gUp === 1 || (p.tiltEnabled === 1 && Math.abs(t.x) > PHYS.fallOn);
-  if (knocked && b.anchored === 0) {
-    if (b.fallen === 0) b.fallDir = Math.abs(t.x) > 0.05 ? Math.sign(t.x) : b.facing;
-    b.fallen = 1;
-    b.hasTarget = 0;
-    b.chase = 0;
-  } else if (b.fallen > 0 && Math.abs(t.x) < PHYS.fallOff && b.y <= 0.0001) {
-    // Back on the floor and the tilt has eased: get up after a moment.
-    b.fallen = Math.max(0, b.fallen - dt * 1.6);
-  }
-  const lying = b.fallen > 0;
-
   if (b.anchored === 1) {
-    if (tiltMag > PHYS.dislodgeTilt || b.gUp === 1) {
-      // Tilted hard enough to tumble out of bed / off the cushion.
-      b.anchored = 0;
-      b.zMax = WORLD.zMax;
-      b.vy = 1.1;
-      events.push(PhysicsEvent.Dislodged, tiltMag, 0);
-    } else {
-      const k = Math.min(1, dt * 6);
-      b.x += (b.anchorX - b.x) * k;
-      b.z += (b.anchorZ - b.z) * k;
-      b.y += (b.anchorY - b.y) * k;
-      b.vx = 0;
-      b.vz = 0;
-      b.vy = 0;
-      b.speed = 0;
-      b.walking = 0;
-      b.lean *= 1 - Math.min(1, dt * 6);
-      b.rot = 0;
-      b.rotV = 0;
-      b.wall = 0;
-      b.wallBlend = 0;
-      stepSquash(b, dt);
-      stepRecoil(b, 0, 0, dt, p.reduceMotion);
-      return;
-    }
+    // Napping on the furniture: stays put (the room may turn around him).
+    const k = Math.min(1, dt * 6);
+    b.x += (b.anchorX - b.x) * k;
+    b.z += (b.anchorZ - b.z) * k;
+    b.y += (b.anchorY - b.y) * k;
+    b.vx = 0;
+    b.vz = 0;
+    b.vy = 0;
+    b.speed = 0;
+    b.walking = 0;
+    b.lean *= 1 - Math.min(1, dt * 6);
+    stepSquash(b, dt);
+    stepRecoil(b, 0, 0, dt, p.reduceMotion);
+    return;
   }
 
   const vx0 = b.vx;
-  const gdir = b.gUp === 1 ? -1 : 1;
+  // A tilt slides him toward the low side like a marble. Tilted far enough,
+  // that side becomes "down": it pulls him over until he stands on it (feet on
+  // the border); the top edge pulls him up to it.
+  const upright = t.side === 0;
+  const gx = t.side === 1 ? -1 : t.side === 3 ? 1 : 0;
+  const gdir = t.side === 2 ? -1 : 1;
   const grounded = b.y <= 0.0001 && b.vy <= 0 && gdir > 0;
   const airFactor = grounded ? 1 : 0.35;
-  let ax = t.x * PHYS.tiltAccel * airFactor;
-  let az = t.z * PHYS.tiltDepthAccel * airFactor;
-  // Knocked over by a hard sideways tilt, that wall becomes "down": he falls
-  // toward it rather than just sliding.
-  if (lying && p.tiltEnabled === 1 && Math.abs(t.x) > PHYS.fallOff) ax += t.x * PHYS.sideGravity;
+  const tiltMag = Math.hypot(t.x, t.z);
+  let ax = upright ? t.x * PHYS.tiltAccel * airFactor : gx * PHYS.gravity;
+  let az = upright ? t.z * PHYS.tiltDepthAccel * airFactor : 0;
 
-  const steering = b.hasTarget === 1 || b.chase === 1;
+  const steering = upright && (b.hasTarget === 1 || b.chase === 1);
   if (steering) {
     const dx = b.tx - b.x;
     const dz = b.tz - b.z;
@@ -341,15 +394,15 @@ export function stepBody(
       events.push(PhysicsEvent.Arrive, b.cmdId, 0);
     } else if (dist > 1e-4) {
       const desired = b.walkSpeed * p.speedBoost * Math.min(1, dist / 0.12);
-      // Strong tilt overpowers walking — the character gets swept along.
-      const will = lying ? 0 : 1 - Math.min(0.9, tiltMag * 2);
+      // A strong tilt overpowers walking: he gets swept along.
+      const will = 1 - Math.min(0.9, tiltMag * 2);
       ax += ((dx / dist) * desired - b.vx) * PHYS.steerGain * will * airFactor;
       az += ((dz / dist) * desired - b.vz) * PHYS.steerGain * will * airFactor;
     }
   }
   if (grounded && !steering) {
-    const f = Math.exp(-(lying ? PHYS.lyingFriction : PHYS.friction) * dt);
-    b.vx *= f;
+    const f = Math.exp(-PHYS.friction * dt);
+    if (gx === 0) b.vx *= f;
     b.vz *= f;
   }
 
@@ -361,8 +414,8 @@ export function stepBody(
     b.vz *= PHYS.maxSpeed / sp;
   }
 
-  // Vertical: hops, drops, landings and bumping the ceiling.
-  const yMax = ceilingY(g, b.z, lying);
+  // Vertical: hops, drops, landings, and the ceiling (where he rests when it's "down").
+  const yMax = ceilingY(g, b.z, false);
   if (b.y > 0 || b.vy > 0 || gdir < 0) {
     b.vy -= PHYS.gravity * gdir * dt;
     b.y += b.vy * dt;
@@ -386,13 +439,12 @@ export function stepBody(
         if (p.reduceMotion === 0) b.squashV += impact * 1.2;
         knock(b, impact * 0.5);
       }
-      // Pressed against the ceiling while gravity points up; otherwise bounce back down.
+      // Resting on it while it's "down"; otherwise bounce back off.
       b.vy = gdir < 0 ? 0 : -impact * 0.3;
     }
   } else {
     b.airborneFrom = now;
   }
-  b.onCeil = gdir < 0 && b.y >= yMax - 0.002 ? 1 : 0;
 
   // Velocity change from forces only (walls are handled as knocks below).
   const dvx = b.vx - vx0;
@@ -402,7 +454,7 @@ export function stepBody(
   // Walls: soft bounce, and tell JS about hard bumps (rate-limited).
   let bumpSpeed = 0;
   let bumpSide = -1;
-  // Tipped over, the stickman is much wider: his head reaches the wall sooner.
+  // Turned sideways, the stickman is wider: keep all of him inside the room.
   const half = bodyHalfX(b.rot);
   const xMin = half;
   const xMax = 1 - half;
@@ -444,7 +496,7 @@ export function stepBody(
       // away, the arms fly, and on a hard hit his feet leave the floor.
       if (bumpSide <= 1) {
         kick = (bumpSide === 0 ? 1 : -1) * bumpSpeed * PHYS.recoilKick;
-        if (!lying && grounded && bumpSpeed > PHYS.knockHop) {
+        if (grounded && bumpSpeed > PHYS.knockHop) {
           b.vy = Math.min(1.3, (bumpSpeed - PHYS.knockHop) * 1.4 + 0.5);
           b.y = 0.001;
           b.airborneFrom = now;
@@ -467,62 +519,26 @@ export function stepBody(
   else if (steering && Math.abs(b.tx - b.x) > 0.03) b.facing = b.tx > b.x ? 1 : -1;
   b.walking = grounded && steering && b.speed > 0.04 && tiltMag < 0.3 ? 1 : 0;
   if (b.walking === 1) b.walkPhase += b.speed * dt * 30;
-  const leanTarget = b.walking === 1 ? clamp(b.vx * 0.3, -0.2, 0.2) : clamp(-t.x * 0.25, -0.3, 0.3);
+  // Sliding, he leans back against the tilt to keep his balance.
+  const leanTarget = b.walking === 1 ? clamp(b.vx * 0.3, -0.2, 0.2) : upright ? clamp(-t.x * 0.25, -0.3, 0.3) : 0;
   b.lean += (leanTarget - b.lean) * Math.min(1, dt * 8);
-
-  // Toppling over, crumpling head-first into the corner, then — while the tilt
-  // holds that wall "down" — rolling over onto his feet to stand on it.
-  let target = 0;
-  let deliberate = false;
-  if (b.wall !== 0) {
-    if (p.tiltEnabled === 0 || b.gUp === 1 || t.x * b.wall < PHYS.wallOff) {
-      // The tilt eased: the floor is the floor again. He's already on his feet,
-      // so he just pivots back down onto it (3π/2 and -π/2 are the same pose).
-      b.rot -= b.wall * Math.PI * 2;
-      b.wall = 0;
-      b.fallen = 0;
-    } else {
-      target = b.wall * Math.PI * 1.5;
-      deliberate = true;
-    }
-  } else if (b.fallen > 0) {
-    const dir = b.fallDir >= 0 ? 1 : -1;
-    target = dir * (Math.PI / 2);
-    // Near the wall he's falling toward (a little slack so he doesn't flicker in and out).
-    const atWall = dir > 0 ? b.x >= xMax - 0.03 : b.x <= xMin + 0.03;
-    const hard = p.tiltEnabled === 1 && b.gUp === 0 ? clamp((Math.abs(t.x) - 0.6) / 0.35, 0, 1) : 0;
-    if (atWall && t.x * dir > 0) target += dir * PHYS.cornerTip * hard;
-    const settled = atWall && t.x * dir > PHYS.wallOn && Math.abs(b.rotV) < 0.6 && Math.abs(b.rot - target) < 0.12;
-    b.wallT = settled ? b.wallT + dt : 0;
-    if (b.wallT > PHYS.wallStandAfter) {
-      b.wall = dir;
-      b.wallT = 0;
-      target = dir * Math.PI * 1.5;
-      deliberate = true;
-    }
-  } else {
-    b.wallT = 0;
-  }
-  stepRot(b, target, dt, now, events, p.reduceMotion, deliberate);
-  b.wallBlend += ((b.wall !== 0 ? 1 : 0) - b.wallBlend) * Math.min(1, dt * 5);
-  // Rotating can widen him past a wall: shove him back out.
-  const half2 = bodyHalfX(b.rot);
-  b.x = clamp(b.x, half2, 1 - half2);
 
   stepSquash(b, dt);
   stepRecoil(b, dvx, kick, dt, p.reduceMotion);
 }
 
-export function stepBall(ball: BallState, b: BodyState, t: TiltState, dt: number, now: number, events: number[]): void {
+export function stepBall(ball: BallState, b: BodyState, t: TiltState, p: PhysicsParams, dt: number, now: number, events: number[]): void {
   'worklet';
   if (ball.present === 0) return;
   const grounded = ball.y <= 0.0001 && ball.vy <= 0;
-  ball.vx += t.x * PHYS.ballTiltAccel * dt;
-  ball.vz += t.z * PHYS.ballTiltAccel * 0.85 * dt;
+  // Rolls downhill when the phone tilts.
+  if (p.tiltEnabled === 1) {
+    ball.vx += t.x * PHYS.ballTiltAccel * dt;
+    ball.vz += t.z * PHYS.ballTiltAccel * 0.85 * dt;
+  }
   const f = Math.exp(-(grounded ? PHYS.ballFriction : 0.1) * dt);
   ball.vx *= f;
   ball.vz *= f;
-
   if (ball.y > 0 || ball.vy > 0) {
     ball.vy -= PHYS.gravity * dt;
     ball.y += ball.vy * dt;

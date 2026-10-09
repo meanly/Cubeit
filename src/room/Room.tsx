@@ -144,6 +144,8 @@ export function Room({ width, height, children, overlay }: Props) {
             finds={finds}
             pokes={pokes}
             reduceMotion={reduceMotion}
+            tilt={world.tilt}
+            mess={world.mess}
           />
           <BallView ball={world.ball} body={world.body} geo={world.geo} dot={g.dot} layer="behind" />
           <CharacterRig
@@ -162,7 +164,7 @@ export function Room({ width, height, children, overlay }: Props) {
           <LcdNight hour={hour} lampLit={room.lampOn && room.items.corner === 'lamp'} />
           <LcdGlass size={width} />
           {/* Speech and emotes sit above the glass so they stay crisp and readable. */}
-          <CharacterOverlay body={world.body} geo={world.geo} visible={world.pose.visible} dot={g.dot} />
+          <CharacterOverlay body={world.body} geo={world.geo} visible={world.pose.visible} dot={g.dot} reduceMotion={reduceMotion} />
         </View>
       </GestureDetector>
       {overlay}

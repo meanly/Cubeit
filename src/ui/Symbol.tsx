@@ -25,6 +25,7 @@ const NAMES: Record<IconId, { sf: SFSymbol; sfFill: SFSymbol; material: AndroidS
   sparkle: { sf: 'sparkles', sfFill: 'sparkles', material: 'auto_awesome' },
   cube: { sf: 'cube', sfFill: 'cube.fill', material: 'view_in_ar' },
   ball: { sf: 'baseball', sfFill: 'baseball.fill', material: 'sports_baseball' },
+  reload: { sf: 'arrow.clockwise', sfFill: 'arrow.clockwise', material: 'refresh' },
 };
 
 /**

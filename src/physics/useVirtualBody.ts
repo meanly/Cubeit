@@ -16,6 +16,7 @@ const STILL_PARAMS: PhysicsParams = {
   calZ: 0,
   reduceMotion: 0,
   speedBoost: 1,
+  orientLocked: 1,
 };
 
 /**

@@ -26,11 +26,7 @@ export type RigBody = Pick<
   | 'recoil'
   | 'flail'
   | 'anchored'
-  | 'fallen'
-  | 'fallDir'
   | 'rot'
-  | 'wallBlend'
-  | 'wall'
 >;
 
 interface Props {
@@ -89,11 +85,7 @@ export const CharacterRig = memo(function CharacterRig({
       vy: b.vy,
       squash: b.squash,
       lean: b.lean,
-      // Still drawn tipped while springing back up after the fall.
-      fallen: b.fallen > 0 || Math.abs(b.rot) > 0.05 ? 1 : 0,
-      fallDir: b.fallDir,
       rot: b.rot,
-      wall: b.wallBlend,
       roomL: (cx - g.L0) / g.dot,
       roomR: (g.R0 - cx) / g.dot,
       roomT: (feet - g.T0) / g.dot,

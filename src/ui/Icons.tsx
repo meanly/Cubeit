@@ -15,7 +15,8 @@ export type IconId =
   | 'gift'
   | 'sparkle'
   | 'cube'
-  | 'ball';
+  | 'ball'
+  | 'reload';
 
 /** A gear outline: eight squared teeth around the hub, centered in a 24-unit box. */
 function gearPath(): string {
@@ -52,6 +53,7 @@ const PATHS: Record<Exclude<IconId, 'settings'>, string[]> = {
   heart: ['M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z'],
   moon: ['M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'],
   gift: ['M4 11h16v9.5H4z', 'M3 7.5h18V11H3z', 'M12 7.5v13', 'M12 7.5S10.5 3.5 8 4.2c-2 .6-1 3.3 4 3.3zM12 7.5s1.5-4 4-3.3c2 .6 1 3.3-4 3.3z'],
+  reload: ['M19.5 12a7.5 7.5 0 1 1-2.2-5.3', 'M19.5 4.5v4.2h-4.2'],
   cube: ['M12 3l8 4.5v9L12 21l-8-4.5v-9z', 'M4 7.5l8 4.5 8-4.5', 'M12 12v9'],
   ball: ['M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17z', 'M3.8 9.5c3 1.2 6.4 4.4 7.4 10.9', 'M20.2 9.5c-3 1.2-6.4 4.4-7.4 10.9', 'M8 4.5c2.2 2 6 2 8 0'],
   sparkle: ['M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2L5 10.5l5.2-1.8z', 'M18.5 16v4M16.5 18h4'],

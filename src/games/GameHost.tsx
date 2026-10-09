@@ -24,6 +24,8 @@ export function GameHost({ roomWidth, roomHeight }: { roomWidth: number; roomHei
   // before parent effects, so resetting here would wipe the scene's actions.
   useEffect(() => {
     if (!game) return;
+    // Games assume the floor is down: keep the room upright however the phone is held.
+    world.params.set({ ...world.params.get(), orientLocked: 1 });
     world.commands.setBallPresent(false);
     world.commands.unanchor();
     getBrain()?.setState('idle');
@@ -32,6 +34,7 @@ export function GameHost({ roomWidth, roomHeight }: { roomWidth: number; roomHei
       const { phase } = useGameSession.getState();
       useGameSession.getState().reset(null);
       world.mode.set(0);
+      world.params.set({ ...world.params.get(), orientLocked: 0 });
       world.commands.freeze(false);
       world.commands.setBallPresent(useGame.getState().room.items.toy === 'ball');
       if (phase !== 'results') emit({ type: 'gameEnded', game, outcome: 'meh', quit: true });

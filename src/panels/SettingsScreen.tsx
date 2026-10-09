@@ -80,7 +80,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
         </Section>
 
         <Section title="Motion">
-          <Row label="Tilt controls" hint="Tilt your phone to move them around the room.">
+          <Row label="Tilt controls" hint="Tilt your phone and they slide that way; tip it right over and they stand on that side. Shake it hard and everything gets knocked about.">
             <Toggle label="Tilt controls" value={settings.motionEnabled} onChange={(v) => toggle({ motionEnabled: v })} />
           </Row>
           {settings.motionEnabled && <MotionSettings />}
@@ -209,7 +209,7 @@ function MotionSettings() {
         <Text style={styles.warning}>This device doesn’t report a motion sensor, so tilt can’t work here. Everything else does — drag to move them instead.</Text>
       )}
       {sensor.source === 'keyboard-sim' && (
-        <Text style={styles.hint}>Web preview: arrow keys / WASD simulate tilting (hold Shift to tilt hard). Real tilt needs the app on a phone.</Text>
+        <Text style={styles.hint}>Web preview: arrow keys / WASD simulate tilting (hold Shift to tip it right over), X shakes. Real tilt needs the app on a phone.</Text>
       )}
       <Text style={styles.label}>Sensitivity</Text>
       <Slider label="Tilt sensitivity" value={settings.tiltSensitivity} min={0.4} max={2} step={0.1} onChange={(v) => set({ tiltSensitivity: v })} />

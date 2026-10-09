@@ -1,7 +1,7 @@
 import { circadianEnergy, driftMood, moodLabel } from '../character/mood';
-import { characterRect, makeGeometry, projectX, projectY, unprojectFloor, WORLD } from '../physics/geometry';
-import { bodyHalfX, shapeTilt, stepBall, stepBody, stepTilt } from '../physics/simulation';
-import { initialBall, initialBody, initialTilt, PhysicsEvent, type PhysicsParams } from '../physics/types';
+import { characterRect, makeGeometry, projectX, projectY, unprojectFloor } from '../physics/geometry';
+import { bodyHalfX, PHYS, scatter, shapeTilt, stepBall, stepBody, stepMess, stepTilt } from '../physics/simulation';
+import { initialBall, initialBody, initialMess, initialTilt, PhysicsEvent, type PhysicsParams, type TiltState } from '../physics/types';
 import { bondLevel, bondProgress, dailyCheck, dayKey, daysBetween, starsForGame } from '../progression/progression';
 
 const params = (over: Partial<PhysicsParams> = {}): PhysicsParams => ({
@@ -13,8 +13,20 @@ const params = (over: Partial<PhysicsParams> = {}): PhysicsParams => ({
   calZ: 0,
   reduceMotion: 0,
   speedBoost: 1,
+  orientLocked: 0,
   ...over,
 });
+
+/** A calibrated tilt state held at raw gravity x (m/s²; negative = left edge down) and y (positive = top edge down). */
+function heldTilt(rawX: number, rawY = -6, steps = 120, p = params()): { t: TiltState; events: number[] } {
+  const t = { ...initialTilt(), rawX: 0, rawY: -6, rawZ: -7.5, hasRaw: 1 };
+  const events: number[] = [];
+  stepTilt(t, p, 1 / 60, events); // calibrate to holding still
+  t.rawX = rawX;
+  t.rawY = rawY;
+  for (let i = 0; i < steps; i++) stepTilt(t, p, 1 / 60, events);
+  return { t, events };
+}
 
 const g = makeGeometry(360, 480);
 
@@ -52,17 +64,72 @@ describe('tilt processing', () => {
     expect(events).toEqual([]);
   });
 
-  it('turns a sustained left tilt into negative x and reports start/end', () => {
-    const t = { ...initialTilt(), rawX: 0, rawY: -6, rawZ: -7.5, hasRaw: 1 };
-    const events: number[] = [];
-    stepTilt(t, params(), 1 / 60, events); // calibrate
-    t.rawX = -4; // left edge down: gravity points left
-    for (let i = 0; i < 60; i++) stepTilt(t, params(), 1 / 60, events);
-    expect(t.x).toBeLessThan(-0.3);
+  it('turns "down" to whichever side is lowest, and back', () => {
+    const { t, events } = heldTilt(-8);
+    expect(t.x).toBeLessThan(-0.6);
+    // Left edge down: side 1, the stickman turned a quarter clockwise.
+    expect(t.side).toBe(1);
+    expect(t.angle).toBeCloseTo(Math.PI / 2, 2);
     expect(events[0]).toBe(PhysicsEvent.TiltStart);
     t.rawX = 0;
     for (let i = 0; i < 120; i++) stepTilt(t, params(), 1 / 60, events);
+    expect(t.side).toBe(0);
+    expect(t.angle).toBeCloseTo(0, 2);
     expect(events).toContain(PhysicsEvent.TiltEnd);
+  });
+
+  it('turns right and upside down too, and keeps a side until the tilt really eases (no flicker)', () => {
+    expect(heldTilt(8).t.angle).toBeCloseTo(-Math.PI / 2, 2);
+    expect(Math.abs(heldTilt(0, 3).t.angle)).toBeCloseTo(Math.PI, 2);
+    const { t } = heldTilt(-8);
+    // Easing to just under the entry tilt still holds the side…
+    t.rawX = -5;
+    for (let i = 0; i < 60; i++) stepTilt(t, params(), 1 / 60, []);
+    expect(t.side).toBe(1);
+    // …and a gentle tilt never moves "down" off the floor.
+    expect(heldTilt(-3).t.side).toBe(0);
+  });
+
+  it('keeps the floor down during games', () => {
+    expect(heldTilt(-8, -6, 120, params({ orientLocked: 1 })).t.side).toBe(0);
+  });
+
+  it('tells the brain when a gentle tilt starts and ends', () => {
+    const { t, events } = heldTilt(-3);
+    expect(events.slice(0, 2)).toEqual([PhysicsEvent.TiltStart, 0]);
+    t.rawX = 0;
+    for (let i = 0; i < 120; i++) stepTilt(t, params(), 1 / 60, events);
+    expect(events).toContain(PhysicsEvent.TiltEnd);
+  });
+
+  it('only leans the furniture a little, toward the low side, even on a hard tilt', () => {
+    const gentle = heldTilt(-3).t;
+    expect(gentle.lean).toBeLessThan(-0.01);
+    const hard = heldTilt(-8, -6, 240).t;
+    expect(hard.side).toBe(1);
+    expect(hard.lean).toBeLessThan(0);
+    expect(Math.abs(hard.lean)).toBeLessThanOrEqual(PHYS.itemLean + 1e-3);
+    expect(heldTilt(8, -6, 240).t.lean).toBeGreaterThan(0);
+    // Games keep everything still.
+    expect(heldTilt(-8, -6, 240, params({ orientLocked: 1 })).t.lean).toBe(0);
+  });
+
+  it('only a real shake makes a mess', () => {
+    const t = { ...initialTilt() };
+    const events: number[] = [];
+    // A couple of bumps drain away…
+    for (let i = 0; i < 120; i++) {
+      if (i % 40 === 0) t.jolt += 1;
+      stepTilt(t, params(), 1 / 60, events);
+    }
+    expect(events).not.toContain(PhysicsEvent.MessUp);
+    // …several hard jolts in quick succession don't.
+    for (let i = 0; i < 20; i++) {
+      if (i % 5 === 0) t.jolt += 1;
+      stepTilt(t, params(), 1 / 60, events);
+    }
+    expect(events).toContain(PhysicsEvent.MessUp);
+    expect(t.messNow).toBe(1);
   });
 
   it('does nothing when tilt is disabled', () => {
@@ -73,15 +140,22 @@ describe('tilt processing', () => {
 });
 
 describe('character physics', () => {
-  it('slides with a gentle tilt until his body touches the wall', () => {
+  it('slides toward the low side on a gentle tilt, still on its feet', () => {
     const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), x: -0.4, z: 0.3 };
-    const events: number[] = [];
-    for (let i = 0; i < 600; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, events);
-    expect(b.fallen).toBe(0);
-    expect(b.z).toBeLessThanOrEqual(WORLD.zMax);
-    expect(b.x).toBeCloseTo(WORLD.xMin, 2);
-    expect(events).toContain(PhysicsEvent.Bump);
+    const { t } = heldTilt(-3);
+    for (let i = 0; i < 60; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
+    expect(b.x).toBeLessThan(0.4);
+    expect(b.rot).toBe(0);
+    // Leaning back against the slope.
+    expect(b.lean).toBeGreaterThan(0);
+  });
+
+  it('gets swept along instead of walking uphill against a strong tilt', () => {
+    const b = { ...initialBody(0.5, 0.3), hasTarget: 1, tx: 0.9, tz: 0.3, cmdId: 1 };
+    const t = { ...initialTilt(), x: -0.5 };
+    for (let i = 0; i < 60; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
+    expect(b.x).toBeLessThan(0.5);
+    expect(b.walking).toBe(0);
   });
 
   it('reacts to a wall with its whole body: knocked back, off its feet, then settles', () => {
@@ -114,77 +188,63 @@ describe('character physics', () => {
     expect(b.flail).toBe(0);
   });
 
-  it('topples over on a hard tilt, falls into the wall and crumples head-first into the corner, then gets up', () => {
+  it('falls to the side that is down and stands on it', () => {
     const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), x: -1 };
+    const { t } = heldTilt(-8);
     const events: number[] = [];
-    const angles: number[] = [];
-    for (let i = 0; i < 300; i++) {
-      stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
-      angles.push(b.rot);
-    }
-    expect(b.fallen).toBeGreaterThan(0);
-    expect(b.fallDir).toBe(-1);
-    // He tips over gradually (passing through in-between angles), not in one frame.
-    expect(angles.some((a) => a < -0.3 && a > -1.2)).toBe(true);
-    // The tilt makes that wall "down": head jammed into the corner, past flat.
-    expect(b.rot).toBeLessThan(-Math.PI / 2 - 0.5);
+    for (let i = 0; i < 240; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
+    expect(b.rot).toBeCloseTo(Math.PI / 2, 2);
+    // Feet against the left border.
     expect(b.x).toBeCloseTo(bodyHalfX(b.rot), 3);
-    expect(events).toContain(PhysicsEvent.Land);
-    t.x = 0;
-    for (let i = 300; i < 480; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
-    expect(b.fallen).toBe(0);
-    expect(Math.abs(b.rot)).toBeLessThan(0.01);
+    expect(events).toContain(PhysicsEvent.Bump);
+    // Upright again, he stays where he landed and stands back up.
+    t.rawX = 0;
+    for (let i = 0; i < 120; i++) {
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, 20 + i / 60, []);
+    }
+    expect(b.rot).toBeCloseTo(0, 2);
+    expect(b.y).toBe(0);
   });
 
-  it('stands up on the wall a held hard tilt makes the floor, then steps back down when it eases', () => {
+  it('rests against the top edge when the phone is upside down, and drops back', () => {
     const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), x: -1 };
+    const { t } = heldTilt(0, 3);
     const events: number[] = [];
-    for (let i = 0; i < 360; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
-    // Feet against the left wall, head toward the room: rotated three quarters (≡ a quarter the other way).
-    expect(b.wall).toBe(-1);
-    expect(b.rot).toBeCloseTo(-Math.PI * 1.5, 1);
-    expect(b.wallBlend).toBeGreaterThan(0.95);
-    expect(b.x).toBeCloseTo(WORLD.lieHalf, 3);
-    // Easing the tilt brings the floor back: he pivots upright, already on his feet.
-    t.x = 0.1;
-    for (let i = 360; i < 480; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
-    expect(b.wall).toBe(0);
-    expect(b.fallen).toBe(0);
-    expect(Math.abs(b.rot)).toBeLessThan(0.02);
-  });
-
-  it('still stands up on the wall at a low frame rate (long steps settle instead of micro-bouncing)', () => {
-    const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), x: -0.86 };
-    for (let i = 0; i < 100; i++) stepBody(b, t, params(), g, 0.05, 10 + i * 0.05, []);
-    expect(b.wall).toBe(-1);
-    expect(b.rot).toBeCloseTo(-Math.PI * 1.5, 1);
-  });
-
-  it('lies flat (not in the corner) when knocked over by a milder tilt', () => {
-    const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), x: -0.55 };
-    for (let i = 0; i < 400; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, []);
-    expect(b.rot).toBeLessThan(-Math.PI / 2 + 0.05);
-    expect(b.rot).toBeGreaterThan(-Math.PI / 2 - 0.25);
-  });
-
-  it('falls up and bumps the ceiling when the screen is tipped over, then drops back', () => {
-    const b = initialBody(0.5, 0.3);
-    const t = { ...initialTilt(), z: 1 };
-    const events: number[] = [];
-    for (let i = 0; i < 300; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, events);
-    expect(b.onCeil).toBe(1);
-    const bumps = events.filter((_, i) => i % 3 === 0 && events[i] === PhysicsEvent.Bump).length;
-    expect(bumps).toBeGreaterThan(0);
-    expect(events.some((e, i) => i % 3 === 2 && events[i - 2] === PhysicsEvent.Bump && e === 4)).toBe(true);
-    t.z = 0;
-    for (let i = 300; i < 500; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, events);
-    expect(b.onCeil).toBe(0);
+    for (let i = 0; i < 240; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
+    expect(b.y).toBeGreaterThan(0.2);
+    expect(Math.abs(b.rot)).toBeCloseTo(Math.PI, 2);
+    t.rawY = -6;
+    for (let i = 0; i < 300; i++) {
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, 20 + i / 60, events);
+    }
     expect(b.y).toBe(0);
     expect(events).toContain(PhysicsEvent.Land);
+  });
+
+  it("doesn't walk while he's on the ceiling", () => {
+    const b = { ...initialBody(0.5, 0.3), hasTarget: 1, tx: 0.5, tz: 0.6, cmdId: 3 };
+    const { t } = heldTilt(0, 3);
+    for (let i = 0; i < 120; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
+    expect(b.z).toBeCloseTo(0.3, 3);
+    expect(b.walking).toBe(0);
+  });
+
+  it('a shake knocks everything out of place, then it all settles back home', () => {
+    const mess = initialMess();
+    const b = initialBody(0.5, 0.3);
+    const ball = initialBall();
+    scatter(mess, b, ball, 0);
+    expect(b.vy).toBeGreaterThan(0);
+    expect(Math.abs(b.messRotV)).toBeGreaterThan(0);
+    expect(ball.vy).toBeGreaterThan(0);
+    for (let i = 0; i < 30; i++) stepMess(mess, 1 / 60);
+    // Furniture is knocked about while the mess holds…
+    expect(mess.v.slice(0, 3).some((v) => Math.abs(v) > 0.2)).toBe(true);
+    for (let i = 0; i < 600; i++) stepMess(mess, 1 / 60);
+    // …and back in place afterwards.
+    expect(mess.v.filter((_, i) => i % 6 < 3).every((v) => Math.abs(v) < 0.01)).toBe(true);
   });
 
   it('walks to a target and reports arrival', () => {
@@ -204,23 +264,28 @@ describe('character physics', () => {
     expect(events).toContain(PhysicsEvent.Land);
   });
 
-  it('stays put while anchored unless tilted hard', () => {
+  it('stays tucked in bed, level with it, on a hard tilt', () => {
     const b = { ...initialBody(0.2, 0.9), anchored: 1, anchorX: 0.2, anchorZ: 0.9, anchorY: 0.05, zMax: 0.93 };
-    const gentle = { ...initialTilt(), x: 0.2 };
-    for (let i = 0; i < 60; i++) stepBody(b, gentle, params(), g, 1 / 60, i / 60, []);
+    const { t } = heldTilt(-8);
+    for (let i = 0; i < 120; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
     expect(b.anchored).toBe(1);
-    const hard = { ...initialTilt(), x: 0.8 };
-    const events: number[] = [];
-    stepBody(b, hard, params(), g, 1 / 60, 2, events);
-    expect(b.anchored).toBe(0);
-    expect(events[0]).toBe(PhysicsEvent.Dislodged);
+    expect(b.x).toBeCloseTo(0.2, 3);
+    expect(b.rot).toBeCloseTo(0, 2);
+  });
+
+  it('rolls the ball downhill', () => {
+    const ball = initialBall();
+    const x0 = ball.x;
+    const t = { ...initialTilt(), x: 0.4 };
+    for (let i = 0; i < 30; i++) stepBall(ball, initialBody(0.1, 0.8), t, params(), 1 / 60, i / 60, []);
+    expect(ball.x).toBeGreaterThan(x0 + 0.02);
   });
 
   it('kicks the ball when walking into it', () => {
     const body = { ...initialBody(0.5, 0.3), vx: 0.6 };
     const ball = { ...initialBall(), x: 0.58, z: 0.3 };
     const events: number[] = [];
-    stepBall(ball, body, initialTilt(), 1 / 60, 1, events);
+    stepBall(ball, body, initialTilt(), params(), 1 / 60, 1, events);
     expect(ball.vx).toBeGreaterThan(0);
     expect(events[0]).toBe(PhysicsEvent.BallHit);
   });
