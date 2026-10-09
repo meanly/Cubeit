@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cubeit-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/start-web.mjs"],
+      "port": 8081,
+      "autoPort": true
+    }
+  ]
+}

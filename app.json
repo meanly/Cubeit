@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Cubeit",
+    "slug": "cubeit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "cubeit",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090B18",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.cubeit.companion"
+    },
+    "android": {
+      "package": "app.cubeit.companion",
+      "adaptiveIcon": {
+        "backgroundColor": "#090B18",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#090B18"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#090B18"
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
