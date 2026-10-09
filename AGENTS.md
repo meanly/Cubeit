@@ -25,11 +25,14 @@ Run lint and typecheck before declaring any task done.
 
 ## Project conventions (Cubeit)
 
-- Single-screen app: the room is always visible; Talk / Play / Customize / Memories / Nearby / Notifications are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used.
+- Single-screen app: the room is always visible; Talk / Play / Customize / Planner / Nearby / Notifications are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used. The Planner sheet (`src/panels/planner/`) replaced the Memories sheet; memories (plus Finds and About) open from its Journal tab. The sheet has one row of tabs and one "+" in the header; editors and detail screens stack on top of the tabs.
 - Per-frame work (physics, sensor, animated styles) stays on the UI thread in worklets; JS moves bodies only through `world.commands`. See `docs/ARCHITECTURE.md`.
 - UI colors come from `useColors()` / `useStyles(makeStyles)` (light and dark palettes in `src/theme/tokens.ts`); never hard-code a palette color in a component.
 - Write shared values with `.set()` (React Compiler lint rules flag `.value =` outside worklets).
-- Saved data shape changes need `SAVE_VERSION` + a migration in `src/state/migrations.ts`.
+- Saved data shape changes need `SAVE_VERSION` + a migration in `src/state/migrations.ts` (planner data: `PLANNER_VERSION` + `PLANNER_MIGRATIONS` in `src/planner/plannerDoc.ts`).
+- Planner writes go through `src/planner/service.ts` / `commitPlanner`, which save synchronously and roll back on failure; only react, reward or say "done" after that returns.
+- The language model never writes data directly: it proposes a `RawIntent`, `src/assistant/resolve.ts` validates it, and writes wait for the user's tap on a confirm card.
+- Native-only modules (llama.rn, expo-speech-recognition, expo-text-extractor) are required lazily so Expo Go and web keep working; they need a development build.
 - Keep the honesty rules: no feature may claim local AI or real nearby discovery that isn't there (see `docs/LOCAL_AI.md`, `docs/NEARBY.md`).
 - Run `npm run typecheck`, `npm run lint` and `npm test` before declaring work done.
 

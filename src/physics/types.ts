@@ -83,14 +83,25 @@ export interface TiltState {
   rawY: number;
   rawZ: number;
   hasRaw: number;
-  /** Auto-calibration captured from the first reading after the sensor starts. */
+  /**
+   * Auto neutral for forward/back tilt: captured from the first reading after
+   * the sensor starts, then slowly following the way the phone is held.
+   */
   autoX: number;
   autoY: number;
   autoZ: number;
   autoValid: number;
-  /** Filtered, calibrated tilt, -1..1 per axis. */
+  /**
+   * Filtered tilt signals, -1..1: `x` slides things sideways (measured from true
+   * level), `y` slides him up/down a side wall he stands on (measured from true
+   * level), `z` moves things toward the back (measured from the neutral angle).
+   */
   x: number;
+  y: number;
   z: number;
+  /** Smoothed gravity in the screen's plane, in g (x right, y toward the top edge): decides which side is down. */
+  gx: number;
+  gy: number;
   /**
    * Which side of the room is "down" for the stickman: 0 the floor, 1 the left
    * wall, 2 the ceiling (screen upside down), 3 the right wall. He falls to it
@@ -150,7 +161,7 @@ export interface PhysicsParams {
 
 /** Event codes sent from the UI-thread simulation to JS (numbers cross threads cheaply). */
 export const PhysicsEvent = {
-  /** a = impact speed, b = side: 0 left, 1 right, 2 front (bottom edge), 3 back, 4 ceiling. */
+  /** a = impact speed, b = side: 0 left, 1 right, 2 front (bottom edge), 3 back, 4 ceiling, 5 floor. */
   Bump: 1,
   Land: 2,
   Arrive: 3,
@@ -231,7 +242,10 @@ export const initialTilt = (): TiltState => ({
   autoZ: 0,
   autoValid: 0,
   x: 0,
+  y: 0,
   z: 0,
+  gx: 0,
+  gy: 0,
   side: 0,
   angle: 0,
   angleV: 0,

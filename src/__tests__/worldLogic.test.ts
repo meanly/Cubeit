@@ -55,13 +55,39 @@ describe('tilt processing', () => {
     expect(shapeTilt(-0.5, 0.035)).toBeLessThan(0);
   });
 
-  it('auto-calibrates to the first reading so holding still means no motion', () => {
-    const t = { ...initialTilt(), rawX: 1.2, rawY: -6, rawZ: -7.5, hasRaw: 1 };
+  it('holding the phone the way it was picked up means no motion', () => {
+    const t = { ...initialTilt(), rawX: 0, rawY: -6, rawZ: -7.5, hasRaw: 1 };
     const events: number[] = [];
     for (let i = 0; i < 60; i++) stepTilt(t, params(), 1 / 60, events);
     expect(t.autoValid).toBe(1);
     expect(Math.abs(t.x)).toBeLessThan(1e-6);
+    expect(Math.abs(t.z)).toBeLessThan(1e-6);
     expect(events).toEqual([]);
+  });
+
+  it('measures sideways tilt from true level, so opening the app tilted never skews it', () => {
+    // Opened while rolled right: that roll is real tilt, not the new "level".
+    const t = { ...initialTilt(), rawX: 2, rawY: -6, rawZ: -7.5, hasRaw: 1 };
+    for (let i = 0; i < 60; i++) stepTilt(t, params(), 1 / 60, []);
+    expect(t.x).toBeGreaterThan(0.1);
+    // Level again → no sideways tilt at all.
+    t.rawX = 0;
+    for (let i = 0; i < 60; i++) stepTilt(t, params(), 1 / 60, []);
+    expect(Math.abs(t.x)).toBeLessThan(1e-3);
+  });
+
+  it('lets the forward/back neutral follow a change of posture', () => {
+    const t = { ...initialTilt(), rawX: 0, rawY: -6, rawZ: -7.5, hasRaw: 1 };
+    stepTilt(t, params(), 1 / 60, []);
+    t.rawY = -8; // now holding it more upright
+    for (let i = 0; i < 30; i++) stepTilt(t, params(), 1 / 60, []);
+    expect(t.z).toBeLessThan(-0.1);
+    for (let i = 0; i < 60 * 40; i++) stepTilt(t, params(), 1 / 60, []);
+    expect(Math.abs(t.z)).toBeLessThan(0.02);
+    // A saved neutral stays put.
+    const saved = { ...initialTilt(), rawX: 0, rawY: -8, rawZ: -5.5, hasRaw: 1 };
+    for (let i = 0; i < 60 * 40; i++) stepTilt(saved, params({ calValid: 1, calY: -6 }), 1 / 60, []);
+    expect(saved.z).toBeLessThan(-0.1);
   });
 
   it('turns "down" to whichever side is lowest, and back', () => {
@@ -159,7 +185,7 @@ describe('character physics', () => {
   });
 
   it('reacts to a wall with its whole body: knocked back, off its feet, then settles', () => {
-    const b = { ...initialBody(0.85, 0.3), vx: 1.6 };
+    const b = { ...initialBody(0.92, 0.3), vx: 1.6 };
     const events: number[] = [];
     let minRecoil = 0;
     let flew = false;
@@ -194,9 +220,9 @@ describe('character physics', () => {
     const events: number[] = [];
     for (let i = 0; i < 240; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
     expect(b.rot).toBeCloseTo(Math.PI / 2, 2);
-    // Feet against the left border.
+    // Feet against the left border: he landed on it.
     expect(b.x).toBeCloseTo(bodyHalfX(b.rot), 3);
-    expect(events).toContain(PhysicsEvent.Bump);
+    expect(events).toContain(PhysicsEvent.Land);
     // Upright again, he stays where he landed and stands back up.
     t.rawX = 0;
     for (let i = 0; i < 120; i++) {
@@ -205,6 +231,108 @@ describe('character physics', () => {
     }
     expect(b.rot).toBeCloseTo(0, 2);
     expect(b.y).toBe(0);
+  });
+
+  it('slides up and down a side wall with the tilt instead of sticking in the corner', () => {
+    const b = initialBody(0.5, 0.3);
+    // Phone turned onto its left edge, top tipped a little lower than the bottom.
+    const { t } = heldTilt(-8, 2.5, 30);
+    expect(t.side).toBe(1);
+    for (let i = 0; i < 240; i++) {
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, []);
+    }
+    const high = b.y;
+    expect(high).toBeGreaterThan(0.2);
+    // Bottom edge lower again: he slides back down the wall, to the corner.
+    t.rawY = -5;
+    for (let i = 0; i < 300; i++) {
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, 20 + i / 60, []);
+    }
+    expect(t.side).toBe(1);
+    expect(b.y).toBe(0);
+    // Out of the corner as soon as the phone tips the other way.
+    t.rawX = 4;
+    t.rawY = -6;
+    for (let i = 0; i < 90; i++) {
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, 30 + i / 60, []);
+    }
+    expect(t.side).toBe(0);
+    expect(b.x).toBeGreaterThan(0.4);
+  });
+
+  it('rests still against a wall it is tilted into (no buzzing)', () => {
+    const b = initialBody(0.5, 0.3);
+    const { t } = heldTilt(-4);
+    expect(t.side).toBe(0);
+    for (let i = 0; i < 180; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
+    const xs: number[] = [];
+    for (let i = 0; i < 60; i++) {
+      stepBody(b, t, params(), g, 1 / 60, 3 + i / 60, []);
+      xs.push(b.x);
+    }
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1e-6);
+    expect(b.vx).toBe(0);
+  });
+
+  it('follows even a gentle tilt rather than walking against it', () => {
+    const b = { ...initialBody(0.5, 0.3), hasTarget: 1, tx: 0.9, tz: 0.3, cmdId: 1 };
+    const t = { ...initialTilt(), x: -0.2 };
+    for (let i = 0; i < 60; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, []);
+    expect(b.x).toBeLessThan(0.45);
+  });
+
+  it('follows a whole tilt gesture smoothly: onto the left wall and back, no jumps, no flicker, never stuck', () => {
+    // Phone held at 45°; it's turned onto its left edge over 2 s, held, then
+    // turned back past level to the right. Sensor at 30 Hz, physics at 60 Hz.
+    const G = 9.81;
+    const m = Math.cos(Math.PI / 4);
+    const b = initialBody(0.5, 0.3);
+    const t = { ...initialTilt(), rawX: 0, rawY: -G * m, rawZ: -G * m, hasRaw: 1 };
+    const keyframes: [number, number][] = [
+      [0, 0],
+      [2, -100],
+      [3, -100],
+      [5.5, 35],
+      [7, 35],
+    ];
+    const angleAt = (time: number) => {
+      for (let i = 1; i < keyframes.length; i++) {
+        const [t1, a1] = keyframes[i];
+        const [t0, a0] = keyframes[i - 1];
+        if (time <= t1) return a0 + ((time - t0) / (t1 - t0)) * (a1 - a0);
+      }
+      return keyframes[keyframes.length - 1][1];
+    };
+    const sides: number[] = [];
+    let maxStep = 0;
+    let minX = 1;
+    for (let i = 0; i < 7 * 60; i++) {
+      const time = i / 60;
+      if (i % 2 === 0) {
+        const a = (angleAt(time) * Math.PI) / 180;
+        t.rawX = G * m * Math.sin(a);
+        t.rawY = -G * m * Math.cos(a);
+      }
+      const x0 = b.x;
+      const y0 = b.y;
+      stepTilt(t, params(), 1 / 60, []);
+      stepBody(b, t, params(), g, 1 / 60, time, []);
+      if (sides[sides.length - 1] !== t.side) sides.push(t.side);
+      maxStep = Math.max(maxStep, Math.hypot(b.x - x0, b.y - y0));
+      minX = Math.min(minX, b.x);
+    }
+    // Floor → left wall → floor, each switch once.
+    expect(sides).toEqual([0, 1, 0]);
+    // He reached the left wall…
+    expect(minX).toBeLessThan(0.2);
+    // …never teleported (< 2 dots a frame)…
+    expect(maxStep).toBeLessThan(2 / 60);
+    // …and tipped the other way, he left the corner and is upright again.
+    expect(b.x).toBeGreaterThan(0.45);
+    expect(b.rot).toBeCloseTo(0, 2);
   });
 
   it('rests against the top edge when the phone is upside down, and drops back', () => {

@@ -36,7 +36,11 @@
 | `lcd/` | The LCD look: palette, a tiny 1-bit `Bitmap` raster with a 3×5 font, `LcdArt` / `LcdGlass` renderers |
 | `room/` | Backdrop & night dimming, furniture pixel art & placement, ball, gestures, the `Room` composite |
 | `games/` | Session store, HUD, Star Catch, Peekaboo, result recording |
-| `conversation/` | Engine interface, scripted engine, local-model placeholder + prompt builder, chat session |
+| `conversation/` | Engine interface, scripted engine, on-device model engine + prompt builder, chat session (proposals, confirm cards) |
+| `assistant/` | Talk → planner: action schema, model-output validation, date phrase parser, rule-based parser, resolver (validation + follow-up questions), executor |
+| `ai/` | On-device model: catalog, download + SHA-256 verify, llama.rn runtime wrapper, prompts, model state |
+| `planner/` | Calendar, habits & routines, chores, journal: pure ops, streaks, recurrence, journal search, document repair, reminders, service (save → reward → react) |
+| `media/` | Voice transcription, photo picking / OCR, temporary file cleanup |
 | `memory/` | Memory types, document repair, recall search, sensitivity check |
 | `progression/` | Friendship levels, XP rules, daily discoveries, milestones, rewards |
 | `nearby/` | Nearby service interface, simulation, visitor choreography |
@@ -46,8 +50,14 @@
 
 ## Persistence
 
-- Two documents: `cubeit.save` (character, mood, room, progress, settings)
-  and `cubeit.memories`, in `expo-sqlite/kv-store` (SQLite, atomic writes).
+- Three documents: `cubeit.save` (character, mood, room, progress, settings),
+  `cubeit.memories`, and `cubeit.planner` (events, habits + logs, chores +
+  history, journal, paid-reward keys), in `expo-sqlite/kv-store` (SQLite,
+  atomic writes). The planner has its own `PLANNER_VERSION` and
+  `PLANNER_MIGRATIONS` (`planner/plannerDoc.ts`).
+- Planner changes go through `commitPlanner` (`state/plannerStore.ts`): the
+  change is written synchronously and **rolled back if the write fails**, so
+  the UI and the assistant only ever report saved changes.
 - Writes are debounced (save 800 ms, memories 250 ms) and **flushed
   synchronously when the app leaves the foreground**.
 - Loading always yields valid data: `migrateSave` runs version steps, then
@@ -132,6 +142,13 @@
   `finishGame()`. The shared HUD handles intro / pause / results.
 - **Conversation engine**: implement `ConversationEngine` and put it first
   in `ENGINES` (`conversation/engine.ts`). See `docs/LOCAL_AI.md`.
+- **New assistant action**: add the intent to `INTENTS` (and the router
+  examples in `ai/prompts.ts`), resolve and validate it in
+  `assistant/resolve.ts`, add the typed action to `AssistantAction`, and map
+  it to a planner service call in `assistant/execute.ts`. The model can only
+  ever reach the planner through that fixed mapping.
+- **Planner data**: change `planner/types.ts`, bump `PLANNER_VERSION`, add a
+  step to `PLANNER_MIGRATIONS` and repair the field in `migratePlanner`.
 - **Nearby transport**: implement `NearbyService` (`nearby/types.ts`). See
   `docs/NEARBY.md`.
 

@@ -10,7 +10,10 @@
     "backgroundColor": "#FFFFFF",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.cubeit.companion"
+      "bundleIdentifier": "app.cubeit.companion",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.cubeit.companion",
@@ -31,8 +34,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "Cubeit uses the microphone only while you record a voice message. It's turned into text on this phone and the recording is deleted.",
+          "recordAudioAndroid": true,
           "enableBackgroundPlayback": false
         }
       ],
@@ -46,7 +49,30 @@
           "backgroundColor": "#FFFFFF"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Cubeit uses the microphone only while you record a voice message. It's turned into text on this phone and the recording is deleted.",
+          "speechRecognitionPermission": "Cubeit turns your voice messages into text using on-device speech recognition. Audio never leaves this phone."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cubeit reads text from photos you pick (on this phone) and can attach them to your journal.",
+          "cameraPermission": "Cubeit uses the camera when you take a photo to read its text (on this phone) or attach it to your journal.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-notifications",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": false,
+          "enableOpenCLAndHexagon": false
+        }
+      ]
     ]
   }
 }

@@ -62,6 +62,20 @@ export class DocumentWriter<T> {
   }
 
   flush(): void {
+    try {
+      this.flushOrThrow();
+    } catch (error) {
+      this.onError(error);
+    }
+  }
+
+  /** Write `data` now (dropping any pending write) and throw if storage fails, for changes that must be confirmed. */
+  writeNow(data: T): void {
+    this.pending = data;
+    this.flushOrThrow();
+  }
+
+  private flushOrThrow(): void {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -69,10 +83,6 @@ export class DocumentWriter<T> {
     if (this.pending === null) return;
     const data = this.pending;
     this.pending = null;
-    try {
-      this.store.set(this.key, JSON.stringify(data));
-    } catch (error) {
-      this.onError(error);
-    }
+    this.store.set(this.key, JSON.stringify(data));
   }
 }

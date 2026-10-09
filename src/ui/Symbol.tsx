@@ -12,7 +12,7 @@ const MATERIAL_OUTLINE = { name: 'MaterialSymbols_500Medium', font: MaterialSymb
 const NAMES: Record<IconId, { sf: SFSymbol; sfFill: SFSymbol; material: AndroidSymbol }> = {
   home: { sf: 'house', sfFill: 'house.fill', material: 'home' },
   talk: { sf: 'bubble.left', sfFill: 'bubble.left.fill', material: 'chat_bubble' },
-  memories: { sf: 'book', sfFill: 'book.fill', material: 'book' },
+  planner: { sf: 'calendar', sfFill: 'calendar', material: 'calendar_month' },
   settings: { sf: 'gearshape', sfFill: 'gearshape.fill', material: 'settings' },
   bell: { sf: 'bell', sfFill: 'bell.fill', material: 'notifications' },
   play: { sf: 'gamecontroller', sfFill: 'gamecontroller.fill', material: 'sports_esports' },

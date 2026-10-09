@@ -3,22 +3,23 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Ellipse } from 'react-native-svg';
 
-import { MOOD_TEXT, moodLabel } from '../character/mood';
-import { FINDS } from '../content/finds';
-import { parseTags } from '../memory/memoryDoc';
-import { checkSensitive } from '../memory/sensitive';
-import { MEMORY_TYPE_LABELS, USER_MEMORY_TYPES, type Memory, type MemoryType } from '../memory/types';
-import { bondProgress, IDLE_UNLOCKS } from '../progression/progression';
-import { grantXp } from '../progression/rewards';
-import { useGame } from '../state/gameStore';
-import { useMemories } from '../state/memoryStore';
-import { fonts, radii } from '../theme/tokens';
-import { confirm } from '../ui/Confirm';
-import { Button, Chip, PressableScale, Segmented, type IconName } from '../ui/primitives';
-import { EmptyState, PanelHeader } from './PanelHost';
-import { useColors, useStyles, type Colors } from '../theme/theme';
+import { MOOD_TEXT, moodLabel } from '../../character/mood';
+import { FINDS } from '../../content/finds';
+import { parseTags } from '../../memory/memoryDoc';
+import { checkSensitive } from '../../memory/sensitive';
+import { MEMORY_TYPE_LABELS, USER_MEMORY_TYPES, type Memory, type MemoryType } from '../../memory/types';
+import { bondProgress, IDLE_UNLOCKS } from '../../progression/progression';
+import { grantXp } from '../../progression/rewards';
+import { useGame } from '../../state/gameStore';
+import { useMemories } from '../../state/memoryStore';
+import { fonts, radii } from '../../theme/tokens';
+import { confirm } from '../../ui/Confirm';
+import { Button, Chip, PressableScale, type IconName } from '../../ui/primitives';
+import { EmptyState, PanelHeader } from '../PanelHost';
+import { useColors, useStyles, type Colors } from '../../theme/theme';
+import type { Open } from './rows';
+import { Group, LinkRow, Muted } from './ui';
 
-type Tab = 'memories' | 'finds' | 'about';
 type Filter = 'all' | 'mine' | 'favorite' | 'moments';
 
 const TYPE_ICON: Record<MemoryType, IconName> = {
@@ -33,42 +34,13 @@ const TYPE_ICON: Record<MemoryType, IconName> = {
 
 const formatDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-export function MemoriesPanel() {
-  const styles = useStyles(makeStyles);
-  const [tab, setTab] = useState<Tab>('memories');
-  const [editing, setEditing] = useState<Memory | 'new' | null>(null);
-
-  if (editing) return <MemoryEditor memory={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />;
-
-  return (
-    <View style={styles.flex}>
-      <PanelHeader
-        title="Memories"
-        right={tab === 'memories' ? <Button compact icon="add" label="New" onPress={() => setEditing('new')} /> : undefined}
-      />
-      <View style={styles.tabs}>
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'memories', label: 'Memories' },
-            { value: 'finds', label: 'Finds' },
-            { value: 'about', label: 'About' },
-          ]}
-        />
-      </View>
-      {tab === 'memories' && <MemoryList onEdit={setEditing} />}
-      {tab === 'finds' && <FindsGrid />}
-      {tab === 'about' && <About />}
-    </View>
-  );
-}
-
-function MemoryList({ onEdit }: { onEdit: (m: Memory) => void }) {
+/** Saved long-term memories (only ever ones the user approved or wrote), plus the character's finds and profile. */
+export function MemoryList({ open }: { open: Open }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const items = useMemories((s) => s.items);
   const name = useGame((s) => s.character.name);
+  const found = useGame((s) => s.progress.finds.length);
   const [filter, setFilter] = useState<Filter>('all');
   const shown = useMemo(() => {
     const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
@@ -86,45 +58,54 @@ function MemoryList({ onEdit }: { onEdit: (m: Memory) => void }) {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.filters}>
-        <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
-        <Chip label="Notes & facts" selected={filter === 'mine'} onPress={() => setFilter('mine')} />
-        <Chip label="Favorites" selected={filter === 'favorite'} onPress={() => setFilter('favorite')} />
-        <Chip label="Moments" selected={filter === 'moments'} onPress={() => setFilter('moments')} />
-      </ScrollView>
+      <Group>
+        <LinkRow icon="heart-outline" title={`About ${name}`} detail="Friendship, personality, little habits" onPress={() => open({ name: 'about' })} />
+        <LinkRow icon="gift-outline" title="Finds" detail={`${found}/${FINDS.length} treasures found`} onPress={() => open({ name: 'finds' })} />
+      </Group>
+      {items.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.filters}>
+          <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <Chip label="Notes & facts" selected={filter === 'mine'} onPress={() => setFilter('mine')} />
+          <Chip label="Favorites" selected={filter === 'favorite'} onPress={() => setFilter('favorite')} />
+          <Chip label="Moments" selected={filter === 'moments'} onPress={() => setFilter('moments')} />
+        </ScrollView>
+      )}
       {shown.length === 0 ? (
         <EmptyState
           icon="book-outline"
           title={items.length === 0 ? 'No memories yet' : 'Nothing here'}
           body={
             items.length === 0
-              ? `Write one with “New”, or tell ${name} “remember that…” in Talk. Memories stay on this device.`
+              ? `Tap + to write one, or tell ${name} “remember that…” in Talk. Memories stay on this device.`
               : 'Try another filter.'
           }
         />
       ) : (
-        shown.map((m) => (
-          <PressableScale key={m.id} accessibilityRole="button" accessibilityHint="Opens the memory to edit or delete" onPress={() => onEdit(m)} style={styles.memory}>
-            <View style={styles.memoryIcon}>
-              <Ionicons name={TYPE_ICON[m.type]} size={18} color={colors.accent} />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.memoryText}>{m.content}</Text>
-              <Text style={styles.memoryMeta}>
-                {MEMORY_TYPE_LABELS[m.type]} · {formatDate(m.createdAt)}
-                {m.importance >= 3 ? ' · ★ important' : ''}
-                {m.tags.length > 0 ? ` · ${m.tags.map((t) => `#${t}`).join(' ')}` : ''}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
-          </PressableScale>
-        ))
+        <Group>
+          {shown.map((m) => (
+            <PressableScale key={m.id} accessibilityRole="button" accessibilityHint="Opens the memory to edit or delete" onPress={() => open({ name: 'memory', memory: m })} style={styles.memory}>
+              <View style={styles.memoryIcon}>
+                <Ionicons name={TYPE_ICON[m.type]} size={18} color={colors.accent} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.memoryText}>{m.content}</Text>
+                <Text style={styles.memoryMeta}>
+                  {MEMORY_TYPE_LABELS[m.type]} · {formatDate(m.createdAt)}
+                  {m.importance >= 3 ? ' · ★ important' : ''}
+                  {m.tags.length > 0 ? ` · ${m.tags.map((t) => `#${t}`).join(' ')}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </PressableScale>
+          ))}
+        </Group>
       )}
+      <Muted>{name} only recalls memories you chose to keep. Chats are never saved automatically.</Muted>
     </ScrollView>
   );
 }
 
-function MemoryEditor({ memory, onDone }: { memory: Memory | null; onDone: () => void }) {
+export function MemoryEditor({ memory, onDone }: { memory: Memory | null; onDone: () => void }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const [type, setType] = useState<MemoryType>(memory?.type ?? 'note');
@@ -219,7 +200,7 @@ function MemoryEditor({ memory, onDone }: { memory: Memory | null; onDone: () =>
   );
 }
 
-function FindsGrid() {
+export function FindsGrid() {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const owned = useGame((s) => s.progress.finds);
@@ -254,7 +235,7 @@ function FindsGrid() {
   );
 }
 
-function About() {
+export function About() {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const { character, progress, mood } = useGame();
@@ -322,17 +303,10 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
   flex: { flex: 1 },
   tabs: { paddingHorizontal: 16, paddingBottom: 6 },
-  list: { paddingHorizontal: 16, paddingBottom: 20, gap: 8 },
+  list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 20, gap: 10 },
   noGrow: { flexGrow: 0 },
   filters: { gap: 8, paddingVertical: 4, alignItems: 'center' },
-  memory: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-  },
+  memory: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   memoryIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   memoryText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20, color: colors.text },
   memoryMeta: { fontFamily: fonts.medium, fontSize: 12, color: colors.textFaint, marginTop: 3 },

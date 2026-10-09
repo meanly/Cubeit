@@ -31,7 +31,7 @@ export const idleUnlocked = (id: IdleUnlockId, level: number) =>
   level >= (IDLE_UNLOCKS.find((u) => u.id === id)?.level ?? Infinity);
 
 /** XP rewards with cooldowns so rapid tapping doesn't farm friendship. */
-export type XpReason = 'tap' | 'pet' | 'chat' | 'game' | 'daily' | 'visit' | 'item' | 'memory';
+export type XpReason = 'tap' | 'pet' | 'chat' | 'game' | 'daily' | 'visit' | 'item' | 'memory' | 'planner';
 
 export const XP_RULES: Record<XpReason, { xp: number; cooldownMs: number }> = {
   tap: { xp: 1, cooldownMs: 15_000 },
@@ -42,7 +42,11 @@ export const XP_RULES: Record<XpReason, { xp: number; cooldownMs: number }> = {
   visit: { xp: 4, cooldownMs: 0 },
   item: { xp: 1, cooldownMs: 30_000 },
   memory: { xp: 2, cooldownMs: 60_000 },
+  planner: { xp: 2, cooldownMs: 30_000 },
 };
+
+/** Stars for finishing real-life things; each is paid once per habit-day, chore occurrence or journal day. */
+export const PLANNER_STARS = { habit: 2, chore: 2, journal: 1 } as const;
 
 /** Local calendar day, e.g. "2026-10-09". */
 export function dayKey(ts: number): string {

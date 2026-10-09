@@ -117,6 +117,27 @@ export function ceilingY(g: RoomGeometry, z: number, lying: boolean): number {
   return (floorY(g, z) - g.T0) / g.unit - (lying ? WORLD.lieHeight : WORLD.charHeight);
 }
 
+/**
+ * Height of the standing figure turned by `rot` (onto a side wall it's lying
+ * along it), resting on its lowest point — matches how the rig turns him
+ * about his middle and drops him (stickman `turnDrop`).
+ */
+export function turnedHeight(rot: number): number {
+  'worklet';
+  const mid = WORLD.charHeight / 2;
+  const shoulders = 6 / LCD_DOTS;
+  const c = Math.abs(Math.cos(rot));
+  const s = Math.abs(Math.sin(rot));
+  const lowest = mid - mid * c - shoulders * s;
+  return mid + mid * c + shoulders * s - Math.max(0, lowest);
+}
+
+/** Highest y the figure, turned by `rot`, can reach at depth z before it touches the ceiling. */
+export function ceilingFor(g: RoomGeometry, z: number, rot: number): number {
+  'worklet';
+  return (floorY(g, z) - g.T0) / g.unit - turnedHeight(rot);
+}
+
 /** Screen rectangle of the character's body at a world position. */
 export function characterRect(g: RoomGeometry, x: number, z: number, y: number) {
   'worklet';

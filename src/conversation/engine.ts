@@ -12,21 +12,15 @@ import type { ConversationContext, ConversationEngine } from './types';
  */
 const ENGINES: readonly ConversationEngine[] = [localModelEngine, scriptedEngine];
 
-let resolved: ConversationEngine | null = null;
-
+/** The first available engine. Re-checked every time: the model can be installed or removed while the app runs. */
 export async function getEngine(): Promise<ConversationEngine> {
-  if (resolved) return resolved;
   for (const engine of ENGINES) {
     try {
-      if ((await engine.status()).available) {
-        resolved = engine;
-        return engine;
-      }
+      if ((await engine.status()).available) return engine;
     } catch {
       // Try the next engine.
     }
   }
-  resolved = scriptedEngine;
   return scriptedEngine;
 }
 

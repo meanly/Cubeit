@@ -52,7 +52,7 @@ export interface CompanionReply {
   /** Suggest saving a memory. Never saved without the user tapping "Save". */
   proposal?: MemoryProposal;
   /** Suggest opening a panel (rendered as a button in the chat). */
-  suggestion?: { label: string; panel: 'play' | 'memories' };
+  suggestion?: { label: string; panel: 'play' | 'planner' };
   /** False when the engine didn't understand — used for honest fallbacks. */
   understood: boolean;
   usedMemoryIds?: string[];
@@ -75,5 +75,10 @@ export interface ConversationEngine {
   readonly kind: EngineKind;
   readonly label: string;
   status(): Promise<EngineStatus>;
-  reply(input: string, context: ConversationContext, history: readonly ChatMessage[]): Promise<CompanionReply>;
+  reply(
+    input: string,
+    context: ConversationContext,
+    history: readonly ChatMessage[],
+    opts?: { onPartial?: (textSoFar: string) => void; today?: readonly string[] },
+  ): Promise<CompanionReply>;
 }

@@ -3,7 +3,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 export type IconId =
   | 'home'
   | 'talk'
-  | 'memories'
+  | 'planner'
   | 'settings'
   | 'bell'
   | 'play'
@@ -37,7 +37,7 @@ function gearPath(): string {
 const PATHS: Record<Exclude<IconId, 'settings'>, string[]> = {
   home: ['M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4v-6h-6v6H5A1.5 1.5 0 0 1 3.5 19z'],
   talk: ['M20.5 11.5a8 8 0 0 1-11.7 7.1L3.5 20l1.5-4.6a8 8 0 1 1 15.5-3.9z', 'M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01'],
-  memories: ['M4.5 19V5.5a2 2 0 0 1 2-2h13v14h-13a2 2 0 0 0-2 2 2 2 0 0 0 2 2h13', 'M9 7.5h6'],
+  planner: ['M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V7A1.5 1.5 0 0 1 5 5.5z', 'M3.5 10h17', 'M8 3.5v4M16 3.5v4', 'M8 14h.01M12 14h.01M16 14h.01'],
   bell: ['M6 9.5a6 6 0 0 1 12 0c0 5.5 2.5 7 2.5 7h-17S6 15 6 9.5z', 'M10 20a2.2 2.2 0 0 0 4 0'],
   play: [
     'M7.5 7h9a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-9a5 5 0 0 1-5-5v0a5 5 0 0 1 5-5z',

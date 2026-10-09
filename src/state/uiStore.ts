@@ -4,7 +4,7 @@ import type { Appearance } from '../content/appearance';
 import type { RoomConfig, GameId } from './schema';
 import type { CharacterState, EmoteId } from '../character/states';
 
-export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'memories' | 'nearby' | 'notifications';
+export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'planner' | 'nearby' | 'notifications';
 
 export interface Toast {
   id: number;
@@ -50,6 +50,10 @@ interface UiStore {
 
   storageProblem: string | null;
   setStorageProblem(problem: string | null): void;
+
+  /** Which Planner tab is showing (kept while the sheet is closed, so links can open a tab). */
+  plannerTab: 'today' | 'calendar' | 'habits' | 'chores' | 'journal';
+  setPlannerTab(tab: UiStore['plannerTab']): void;
 }
 
 let toastId = 1;
@@ -81,6 +85,9 @@ export const useUi = create<UiStore>()((set) => ({
 
   storageProblem: null,
   setStorageProblem: (storageProblem) => set({ storageProblem }),
+
+  plannerTab: 'today',
+  setPlannerTab: (plannerTab) => set({ plannerTab }),
 }));
 
 /** What the character is doing right now — drives the face and overlays. */

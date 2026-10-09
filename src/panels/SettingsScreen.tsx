@@ -5,7 +5,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ModelSettings } from './ModelSettings';
+import { useModel } from '../ai/modelStore';
 import { clearChat } from '../conversation/chatSession';
+import { buildExport } from '../state/exportData';
+import { deleteAllJournalImages } from '../media/files';
+import { usePlanner } from '../state/plannerStore';
 import { describeEngines } from '../conversation/engine';
 import { useWorld } from '../physics/World';
 import { useSensorStatus } from '../sensors/sensorStatus';
@@ -28,8 +33,11 @@ export function SettingsScreen() {
   const open = useUi((s) => s.settingsOpen);
   const close = () => useUi.getState().setSettingsOpen(false);
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={close} statusBarTranslucent>
-      <GestureHandlerRootView style={styles.flex}>
+    // Transparent window + an opaque themed backing: Android's default dialog
+    // window background is white, and it shows whenever the app is resumed with
+    // Settings open, before the content has redrawn.
+    <Modal visible={open} animationType="slide" onRequestClose={close} statusBarTranslucent transparent>
+      <GestureHandlerRootView style={[styles.flex, styles.screen]}>
         {open && <SettingsContent onClose={close} />}
         <ConfirmHost scope="settings" />
       </GestureHandlerRootView>
@@ -47,9 +55,11 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
   const [draftName, setDraftName] = useState(name);
   const [engines, setEngines] = useState<{ label: string; available: boolean; detail: string }[]>([]);
 
+  // Re-read whenever the model is installed, loaded or removed.
+  const modelState = useModel((s) => s.status.state);
   useEffect(() => {
     void describeEngines().then(setEngines);
-  }, []);
+  }, [modelState]);
 
   const toggle = (patch: Parameters<typeof set>[0]) => {
     set(patch);
@@ -142,6 +152,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
         </Section>
 
         <Section title="Talking">
+          <ModelSettings />
           {engines.map((e) => (
             <View key={e.label} style={styles.engine}>
               <View style={[styles.dot, { backgroundColor: e.available ? colors.success : colors.textFaint }]} />
@@ -164,9 +175,11 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
 
         <Section title="Privacy">
           <Text style={styles.body}>
-            Cubeit works fully offline. {name}, your memories and your settings are stored only on this device ({kv.backend === 'sqlite' ? 'in a local SQLite database' : 'in local browser storage'}). There’s no account,
-            no analytics and no servers. Chat messages are never saved — only memories you choose to keep. Motion sensor data is used live to move{' '}
-            {name} and is never recorded.
+            Cubeit works fully offline. {name}, your memories, calendar, habits, chores, journal and settings are stored only on this device (
+            {kv.backend === 'sqlite' ? 'in a local SQLite database' : 'in local browser storage'}). There’s no account, no analytics and no servers. The only
+            internet request Cubeit ever makes is downloading the on-device AI model, and only when you tap Download — your messages, voice and photos
+            are processed on this phone and never uploaded. Chat messages are never saved — only memories and planner items you confirm. Voice
+            recordings and photo copies are deleted as soon as they’ve been used. Motion sensor data is used live to move {name} and is never recorded.
           </Text>
         </Section>
 
@@ -241,7 +254,7 @@ function DataActions() {
   const count = useMemories((s) => s.items.length);
 
   const exportData = async () => {
-    const payload = JSON.stringify({ exportedAt: new Date().toISOString(), save: pickSave(useGame.getState()), memories: useMemories.getState().items }, null, 2);
+    const payload = JSON.stringify(buildExport(pickSave(useGame.getState()), useMemories.getState().items, usePlanner.getState()), null, 2);
     try {
       if (Platform.OS === 'web' && navigator.clipboard) {
         await navigator.clipboard.writeText(payload);
@@ -278,12 +291,14 @@ function DataActions() {
     if (
       await confirm({
         title: 'Start over?',
-        message: 'This erases your character, friendship, stars, unlocks and all memories from this device. It can’t be undone.',
+        message: 'This erases your character, friendship, stars, unlocks, memories, calendar, habits, chores and journal from this device. It can’t be undone. (The AI model stays installed; delete it under Talking.)',
         confirmLabel: 'Erase everything',
         destructive: true,
       })
     ) {
       useMemories.getState().clear();
+      usePlanner.getState().clear();
+      deleteAllJournalImages();
       clearChat();
       useGame.getState().resetAll();
       world.commands.teleport(0.5, 0.3);

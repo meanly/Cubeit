@@ -10,6 +10,13 @@ export const DEFAULT_UNLOCK: Unlock = { kind: 'default' };
 export type ContentKind = 'theme' | 'light' | 'item' | 'color' | 'accessory' | 'device';
 export const unlockKey = (kind: ContentKind, id: string) => `${kind}:${id}`;
 
+/**
+ * TEMPORARY: content kinds that are free for everyone right now, whatever their
+ * normal unlock. Nothing is written to the save, so emptying this list restores
+ * the usual prices and friendship levels.
+ */
+export const FREE_FOR_NOW: readonly ContentKind[] = ['theme'];
+
 export function unlockLabel(unlock: Unlock): string {
   switch (unlock.kind) {
     case 'default':
@@ -31,6 +38,7 @@ export function isUnlocked(
   unlocked: readonly string[],
   bondLevel: number,
 ): boolean {
+  if (FREE_FOR_NOW.some((kind) => id.startsWith(`${kind}:`))) return true;
   switch (unlock.kind) {
     case 'default':
       return true;

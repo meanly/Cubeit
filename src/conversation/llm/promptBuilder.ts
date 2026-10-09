@@ -21,7 +21,7 @@ export function relevantMemories(input: string, memories: readonly Memory[], lim
   return [...hits, ...extra].slice(0, limit);
 }
 
-export function buildSystemPrompt(ctx: ConversationContext, memories: readonly Memory[]): string {
+export function buildSystemPrompt(ctx: ConversationContext, memories: readonly Memory[], today: readonly string[] = []): string {
   const p = ctx.personality;
   const memoryLines =
     memories.length > 0 ? memories.map((m) => `- ${m.content}`).join('\n') : '- (no saved memories yet)';
@@ -34,9 +34,11 @@ export function buildSystemPrompt(ctx: ConversationContext, memories: readonly M
     '- You only remember what is in SAVED MEMORIES below. Never invent past events or claim to remember anything else.',
     '- If the user wants something remembered, say you can save it — the app will ask them to confirm.',
     '- You run offline on the phone. You cannot browse the internet or know current news or weather.',
+    '- The app handles calendar, habits, chores and journal requests itself and shows a confirm button. Never say you added, changed, completed or saved anything.',
     '- If the user seems in danger, gently encourage them to contact someone they trust or local emergency services.',
     'SAVED MEMORIES:',
     memoryLines,
+    ...(today.length > 0 ? ['TODAY (from the app):', ...today.map((l) => `- ${l}`)] : []),
   ].join('\n');
 }
 
@@ -46,11 +48,12 @@ export function buildCompanionPrompt(
   ctx: ConversationContext,
   history: readonly ChatMessage[],
   maxTurns = 6,
+  today: readonly string[] = [],
 ): PromptMessage[] {
   const memories = relevantMemories(input, ctx.memories);
   const turns: PromptMessage[] = history.slice(-maxTurns).map((m) => ({
     role: m.from === 'user' ? 'user' : 'assistant',
     content: m.text,
   }));
-  return [{ role: 'system', content: buildSystemPrompt(ctx, memories) }, ...turns, { role: 'user', content: input }];
+  return [{ role: 'system', content: buildSystemPrompt(ctx, memories, today) }, ...turns, { role: 'user', content: input }];
 }

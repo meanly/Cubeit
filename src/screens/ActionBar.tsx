@@ -11,12 +11,12 @@ import { useColors, useStyles, type Colors } from '../theme/theme';
 
 export const ACTION_BAR_HEIGHT = 84;
 
-type Tab = Extract<IconId, 'home' | 'talk' | 'memories' | 'settings'>;
+type Tab = Extract<IconId, 'home' | 'talk' | 'planner' | 'settings'>;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'talk', label: 'Talk' },
-  { id: 'memories', label: 'Memories' },
+  { id: 'planner', label: 'Planner' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -38,7 +38,7 @@ export function ActionBar({ disabled }: { disabled?: boolean }) {
   const styles = useStyles(makeStyles);
   const panel = useUi((s) => s.panel);
   const settingsOpen = useUi((s) => s.settingsOpen);
-  const active: Tab = settingsOpen ? 'settings' : panel === 'talk' ? 'talk' : panel === 'memories' ? 'memories' : 'home';
+  const active: Tab = settingsOpen ? 'settings' : panel === 'talk' ? 'talk' : panel === 'planner' ? 'planner' : 'home';
 
   const go = (tab: Tab) => {
     const ui = useUi.getState();

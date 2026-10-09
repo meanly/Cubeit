@@ -370,6 +370,11 @@ export class Brain {
         return this.interrupt(B.greet(event.text));
       case 'levelUp':
         return this.interrupt(B.celebrate(`Friendship level ${event.level}!`));
+      case 'plannerDone':
+        if (!this.isFree() || this.held) return;
+        if (event.kind === 'habit') return this.interrupt(B.celebrate(event.text));
+        if (event.kind === 'journal') return this.interrupt(B.acknowledge(event.text));
+        return this.interrupt(B.reactSurprise([event.text], 'happy'));
       case 'customizeApplied':
         if (this.mode !== 'free') return;
         return this.interrupt(B.reactSurprise(LINES.newLook, 'excited'));

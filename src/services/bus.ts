@@ -22,6 +22,8 @@ export type WorldEvent =
   | { type: 'gameStarted'; game: GameId }
   | { type: 'gameEnded'; game: GameId; outcome: 'great' | 'good' | 'meh'; quit: boolean }
   | { type: 'unlocked' }
+  /** A planner change that was saved successfully (never emitted before the save). */
+  | { type: 'plannerDone'; kind: 'habit' | 'chore' | 'journal' | 'event'; text: string }
   | { type: 'customizeApplied' };
 
 type Listener = (event: WorldEvent) => void;

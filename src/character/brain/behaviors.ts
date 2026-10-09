@@ -415,6 +415,20 @@ export function celebrate(text: string): Behavior {
   });
 }
 
+/** A quiet, warm nod (e.g. after a journal entry is saved): no hopping, just a little heart. */
+export function acknowledge(text: string): Behavior {
+  return behavior('acknowledge', async (ctx) => {
+    const { brain } = ctx;
+    brain.world.commands.stop();
+    brain.setState('love');
+    brain.emote('book', 1800);
+    brain.say(text, 2200);
+    await ctx.wait(2200);
+    brain.setState('happy');
+    await ctx.wait(500);
+  });
+}
+
 export function reactSurprise(lines: readonly string[], state: CharacterState): Behavior {
   return behavior('reactSurprise', async (ctx) => {
     const { brain } = ctx;

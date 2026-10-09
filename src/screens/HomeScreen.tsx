@@ -12,6 +12,7 @@ import { PanelHost } from '../panels/PanelHost';
 import { SettingsScreen } from '../panels/SettingsScreen';
 import { LCD_DOTS } from '../lcd/bitmap';
 import { WorldProvider } from '../physics/World';
+import { useReminderSync } from '../planner/hooks';
 import { useDailyLife } from '../progression/useDailyLife';
 import { Room } from '../room/Room';
 import { TiltSensorHost } from '../sensors/TiltSensorHost';
@@ -32,6 +33,8 @@ const SIDE = 16;
 const SCREEN_SCALE = 0.86;
 /** Space between the device and the stat cards. */
 const GROUP_GAP = 40;
+/** Space kept between the device and an open sheet. */
+const SHEET_GAP = 24;
 
 export function HomeScreen() {
   return (
@@ -50,6 +53,7 @@ function HomeContent() {
   const visitor = useUi((s) => s.visitor);
   useCharacterBrain();
   useDailyLife(onboarded);
+  useReminderSync();
 
   // The device and the cards below it form one group, centered between the
   // logo bar and the nav, with a fixed gap between them and room above the nav.
@@ -73,7 +77,7 @@ function HomeContent() {
   // The open panel's top edge: the device slides up, then scales down, to stay above it.
   const panelTop = useSharedValue(10_000);
   const roomStyle = useAnimatedStyle(() => {
-    const limit = panelTop.value - 10;
+    const limit = panelTop.value - SHEET_GAP;
     const scale = Math.max(0.3, Math.min(1, (limit - regionTop) / frameH));
     const top = Math.max(regionTop, Math.min(roomTop, limit - frameH * scale));
     return { transform: [{ translateY: top - roomTop }, { scale }] };

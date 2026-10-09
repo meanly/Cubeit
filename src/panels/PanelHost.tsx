@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, {
   Easing,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -24,10 +26,57 @@ const PANEL_HEIGHT: Record<OpenPanel, number> = {
   talk: 0.5,
   play: 0.46,
   customize: 0.5,
-  memories: 0.6,
+  planner: 0.72,
   nearby: 0.5,
   notifications: 0.55,
 };
+
+/** Pull the sheet down this far (or flick it) and it closes. */
+const CLOSE_DRAG = 120;
+const CLOSE_FLICK = 900;
+
+interface SheetDrag {
+  /** How far the sheet is pulled down by a finger, in px. */
+  offset: SharedValue<number>;
+  close: () => void;
+}
+
+const SheetDragContext = createContext<SheetDrag | null>(null);
+
+/**
+ * Drag-down-to-dismiss, for the sheet's grabber and title row. Each caller gets
+ * its own gesture (a gesture can only be attached to one detector).
+ */
+function useSheetDragGesture() {
+  const ctx = useContext(SheetDragContext);
+  const offset = ctx?.offset;
+  const close = ctx?.close;
+  // Measured from the absolute finger position (translation isn't reliable on web).
+  const startY = useSharedValue(0);
+  return Gesture.Pan()
+    .enabled(!!ctx)
+    .activeOffsetY([-10, 10])
+    .failOffsetX([-20, 20])
+    .onBegin((e) => {
+      'worklet';
+      startY.set(e.absoluteY);
+    })
+    .onUpdate((e) => {
+      'worklet';
+      if (!offset) return;
+      const dy = e.absoluteY - startY.value;
+      // Down follows the finger; up only gives a little.
+      offset.set(dy > 0 ? dy : dy * 0.15);
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (!offset || !close) return;
+      // How far it was pulled, as last applied (end events don't always carry a position).
+      const dy = offset.value;
+      if (dy > CLOSE_DRAG || (dy > 20 && e.velocityY > CLOSE_FLICK)) scheduleOnRN(close);
+      else offset.set(withSpring(0, { damping: 18, stiffness: 220 }));
+    });
+}
 
 interface Props {
   panels: Record<OpenPanel, ComponentType>;
@@ -49,20 +98,25 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
   if (panel !== 'none' && panel !== shown) setShown(panel);
   const progress = useSharedValue(0);
   const height = useSharedValue(0);
+  const drag = useSharedValue(0);
   const keyboard = useReanimatedKeyboardAnimation();
 
   useEffect(() => {
     if (panel !== 'none') {
+      drag.set(withSpring(0, { damping: 18, stiffness: 220 }));
       height.set(withTiming(Math.round(rootHeight * PANEL_HEIGHT[panel]) + bottomInset, { duration: 260 }));
       progress.set(withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) }));
     } else {
       progress.set(
         withTiming(0, { duration: 240, easing: Easing.in(Easing.cubic) }, (finished) => {
-          if (finished) scheduleOnRN(setShown, 'none');
+          if (!finished) return;
+          // A dismiss by dragging closes from wherever the finger let go.
+          drag.set(0);
+          scheduleOnRN(setShown, 'none');
         }),
       );
     }
-  }, [panel, rootHeight, bottomInset, height, progress]);
+  }, [panel, rootHeight, bottomInset, height, progress, drag]);
 
   // Android back button closes the open panel first.
   useEffect(() => {
@@ -78,7 +132,8 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
     () => {
       const kb = Math.abs(keyboard.height.value);
       const h = Math.min(height.value, rootHeight - kb - topReserve);
-      return rootHeight - (h + kb) * progress.value;
+      // While the sheet is pulled down the room grows back with it.
+      return rootHeight - (h + kb) * progress.value + Math.max(0, drag.value);
     },
     (top) => {
       panelTop.set(top);
@@ -94,16 +149,31 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
     return {
       height: h,
       paddingBottom: kb > 0 ? 8 : bottomInset,
-      transform: [{ translateY: (1 - progress.value) * (h + 30) - kb }],
+      transform: [{ translateY: (1 - progress.value) * (h + 30) - kb + drag.value }],
     };
   });
 
   const Content = shown !== 'none' ? panels[shown] : null;
   return (
-    <Animated.View style={[styles.sheet, style]} pointerEvents={panel === 'none' ? 'none' : 'box-none'}>
-      <View style={styles.grabber} />
-      {Content && <Content />}
-    </Animated.View>
+    <SheetDragContext.Provider value={{ offset: drag, close: closePanel }}>
+      <Animated.View style={[styles.sheet, style]} pointerEvents={panel === 'none' ? 'none' : 'box-none'}>
+        <SheetHandle />
+        {Content && <Content />}
+      </Animated.View>
+    </SheetDragContext.Provider>
+  );
+}
+
+/** The grabber, with a tall-enough strip around it to catch a drag. */
+function SheetHandle() {
+  const styles = useStyles(makeStyles);
+  const gesture = useSheetDragGesture();
+  return (
+    <GestureDetector gesture={gesture}>
+      <View style={styles.handle} accessibilityLabel="Drag down to close">
+        <View style={styles.grabber} />
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -112,19 +182,22 @@ export function PanelHeader({ title, right, onBack }: { title: string; right?: R
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const closePanel = useUi((s) => s.closePanel);
+  const gesture = useSheetDragGesture();
   return (
-    <View style={styles.header}>
-      <View style={styles.headerLeft}>
-        {onBack && <IconButton icon="chevron-back" label="Back" onPress={onBack} color={colors.text} />}
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
+    <GestureDetector gesture={gesture}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {onBack && <IconButton icon="chevron-back" label="Back" onPress={onBack} color={colors.text} />}
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
+          {right}
+          <IconButton icon="close" label="Close" onPress={closePanel} />
+        </View>
       </View>
-      <View style={styles.headerRight}>
-        {right}
-        <IconButton icon="close" label="Close" onPress={closePanel} />
-      </View>
-    </View>
+    </GestureDetector>
   );
 }
 
@@ -159,13 +232,12 @@ const makeStyles = (colors: Colors) =>
     shadowOffset: { width: 0, height: -6 },
     elevation: 16,
   },
+  handle: { height: 20, alignItems: 'center', justifyContent: 'center' },
   grabber: {
-    alignSelf: 'center',
     width: 36,
     height: 5,
     borderRadius: 3,
     backgroundColor: colors.lineStrong,
-    marginTop: 8,
   },
   header: {
     flexDirection: 'row',
