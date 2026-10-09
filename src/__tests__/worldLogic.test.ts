@@ -84,6 +84,36 @@ describe('character physics', () => {
     expect(events).toContain(PhysicsEvent.Bump);
   });
 
+  it('reacts to a wall with its whole body: knocked back, off its feet, then settles', () => {
+    const b = { ...initialBody(0.85, 0.3), vx: 1.6 };
+    const events: number[] = [];
+    let minRecoil = 0;
+    let flew = false;
+    let maxFlail = 0;
+    for (let i = 0; i < 30; i++) {
+      stepBody(b, initialTilt(), params({ tiltEnabled: 0 }), g, 1 / 60, 10 + i / 60, events);
+      minRecoil = Math.min(minRecoil, b.recoil);
+      maxFlail = Math.max(maxFlail, b.flail);
+      if (b.y > 0.01) flew = true;
+    }
+    expect(events).toContain(PhysicsEvent.Bump);
+    // Hit the right wall: the upper body is thrown left, away from it.
+    expect(minRecoil).toBeLessThan(-0.5);
+    expect(maxFlail).toBeGreaterThan(0.5);
+    expect(flew).toBe(true);
+    for (let i = 30; i < 400; i++) stepBody(b, initialTilt(), params({ tiltEnabled: 0 }), g, 1 / 60, 10 + i / 60, events);
+    expect(Math.abs(b.recoil)).toBeLessThan(0.02);
+    expect(b.flail).toBe(0);
+    expect(b.y).toBe(0);
+  });
+
+  it('keeps the body still on knocks with reduce motion', () => {
+    const b = { ...initialBody(0.85, 0.3), vx: 1.6 };
+    for (let i = 0; i < 30; i++) stepBody(b, initialTilt(), params({ tiltEnabled: 0, reduceMotion: 1 }), g, 1 / 60, i / 60, []);
+    expect(b.recoil).toBe(0);
+    expect(b.flail).toBe(0);
+  });
+
   it('is knocked over by a hard tilt, slides head-first into the wall, then gets up', () => {
     const b = initialBody(0.5, 0.3);
     const t = { ...initialTilt(), x: -1 };

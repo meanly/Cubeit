@@ -83,6 +83,13 @@
   lying down to sleep…) live in `character/pixel/stickman.ts`, a pure
   worklet that stamps a skeleton onto a 32×32 dot sprite each frame;
   `CharacterRig` only feeds it shared values and places the sprite.
+  Knocks read through the whole body: the physics keeps a `recoil` spring
+  (driven by every velocity change, kicked by wall hits) and a decaying
+  `flail`, which the sprite spreads across hips, chest, head, arms and knees.
+- **UI chrome**: liquid glass. Surfaces use `Glass` (`ui/Glass.tsx`): native
+  Liquid Glass on iOS 26+, `expo-blur` elsewhere (Android blurs the
+  `GlassBackdrop`, so glass must render outside it). Colors live in
+  `theme/tokens.ts`.
 - **New behavior**: add a `Behavior` in `brain/behaviors.ts` and a weight in
   `choose()`. Use `ctx.wait` / `ctx.walkTo` so it stays interruptible.
 - **New game**: a scene component (reads `useWorld()`), registered in

@@ -102,7 +102,7 @@ function MemoryList({ onEdit }: { onEdit: (m: Memory) => void }) {
         shown.map((m) => (
           <PressableScale key={m.id} accessibilityRole="button" accessibilityHint="Opens the memory to edit or delete" onPress={() => onEdit(m)} style={styles.memory}>
             <View style={styles.memoryIcon}>
-              <Ionicons name={TYPE_ICON[m.type]} size={18} color={colors.glow} />
+              <Ionicons name={TYPE_ICON[m.type]} size={18} color={colors.accent} />
             </View>
             <View style={styles.flex}>
               <Text style={styles.memoryText}>{m.content}</Text>

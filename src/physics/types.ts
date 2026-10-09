@@ -22,6 +22,15 @@ export interface BodyState {
   squash: number;
   squashV: number;
   lean: number;
+  /**
+   * Whole-body inertia spring (+ = upper body thrown right, roughly -1.4..1.4).
+   * Every change in velocity drives it, and hard knocks kick it directly, so
+   * the rig can bend hips, chest, head and arms together instead of only leaning.
+   */
+  recoil: number;
+  recoilV: number;
+  /** 0..1, set by hard knocks and decaying: arms fly out, knees buckle, feet stagger. */
+  flail: number;
   /** > 0 while knocked over by a hard tilt (counts down to getting up); head toward fallDir. */
   fallen: number;
   fallDir: number;
@@ -125,6 +134,9 @@ export function initialBody(x: number, z: number): BodyState {
     squash: 0,
     squashV: 0,
     lean: 0,
+    recoil: 0,
+    recoilV: 0,
+    flail: 0,
     fallen: 0,
     fallDir: 1,
     gUp: 0,

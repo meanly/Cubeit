@@ -4,8 +4,8 @@ import type { CharacterState } from '../states';
 /**
  * Cube World–style pixel stickman, drawn the way the toy's LCD figures are:
  * no face, a solid rounded 4×4 head, a 4-dot chest narrowing to a 2-dot
- * waist, 2-dot-thick limbs, thighs angled out over straight shins, and a toe
- * on each foot. About 25 dots tall on the 60-dot screen.
+ * waist, slim arms (solid 1-dot lines), sturdier 2-dot legs (thighs angled out over
+ * straight shins), and a toe on each foot. About 28 dots tall on the 60-dot screen.
  *
  * A skeleton is posed in dot units (x right from the body's center line,
  * u up from the floor), then every bone is stamped with a square brush onto
@@ -14,28 +14,33 @@ import type { CharacterState } from '../states';
  * Everything here is a pure worklet so the rig can redraw on the UI thread
  * every frame; the output is SVG path data in the sprite's 0..GRID viewBox.
  */
-export const GRID = 32;
+export const GRID = 36;
 /** The body's center line runs between columns C-1 and C. */
 const C = GRID / 2;
 /** Lit dots overlap a hair so no seams show between them. */
 const INSET = -0.02;
 const DOT = 1 - INSET * 2;
 
-const HIP_U = 13;
+const HIP_U = 15;
 /** Hip to the top of the chest. */
-const TORSO = 8;
+const TORSO = 9;
 /** Height of the top of the head above the floor when standing. */
 export const HEAD_TOP_U = HIP_U + TORSO + 4;
-const UPPER_ARM = 4.5;
-const FOREARM = 4.5;
-const THIGH = 6;
-const SHIN = 7;
+const UPPER_ARM = 5;
+const FOREARM = 5;
+const THIGH = 7;
+const SHIN = 8;
 /** Resting arm angle from straight down (the classic A-shaped arms). */
 const ARM_REST = 0.85;
 /** Upper arms stop here; any further raise bends the forearm, so hands stay clear of the head. */
 const ARM_MAX = 2.3;
 const FEET_SPREAD = 4;
 const HIP_X = 1;
+/** Limb thickness in dots. */
+const ARM_W = 1;
+/** Legs are 2 dots (thighs read wider on the diagonal), heavier than the slim arms. */
+const THIGH_W = 2;
+const LEG_W = 2;
 const SHOULDER_X = 2;
 
 const STATE_ORDER: readonly CharacterState[] = [
@@ -132,6 +137,14 @@ export interface StickmanInput {
   wave: number;
   lookX: number;
   spin: number;
+  /**
+   * Whole-body inertia from the physics (BodyState.recoil): + means the upper
+   * body is thrown right. Hips, chest and head move by growing amounts and the
+   * arms trail behind, so a knock ripples through the entire figure.
+   */
+  recoil: number;
+  /** 0..1 after a hard knock: arms fly out, knees buckle, feet stagger. */
+  flail: number;
 }
 
 export interface StickmanFrame {
@@ -172,6 +185,8 @@ export const IDLE_INPUT: StickmanInput = {
   wave: 0,
   lookX: 0,
   spin: 0,
+  recoil: 0,
+  flail: 0,
 };
 
 function plot(grid: number[], c: number, r: number, v: number) {
@@ -179,21 +194,58 @@ function plot(grid: number[], c: number, r: number, v: number) {
   if (c >= 0 && c < GRID && r >= 0 && r < GRID) grid[r * GRID + c] = v;
 }
 
-/** Square brush of s×s dots centered on (x, u). */
+/** The dot column (relative to C) containing x, mirrored exactly about the center line. */
+function symCell(x: number): number {
+  'worklet';
+  return x >= 0 ? Math.floor(x) : -Math.floor(-x) - 1;
+}
+
+/** Square brush of s×s dots centered on (x, u). Columns are mirror-exact about the center line. */
 function stamp(grid: number[], x: number, u: number, s: number) {
   'worklet';
-  const c0 = Math.round(C + x - s / 2);
+  const c0 = s % 2 === 1 ? C + symCell(x) - (s - 1) / 2 : C + (x >= 0 ? Math.floor(x + 0.5) : -Math.floor(-x + 0.5)) - s / 2;
   const r0 = Math.round(GRID - u - s / 2);
   for (let r = r0; r < r0 + s; r++) for (let c = c0; c < c0 + s; c++) plot(grid, c, r, 1);
 }
 
-/** A 2-dot-thick bone between two (already transformed) points. */
-function bone(grid: number[], p: number[], a: number, b: number) {
+/** A bone `w` dots thick between two (already transformed) points. */
+function bone(grid: number[], p: number[], a: number, b: number, w: number) {
   'worklet';
+  if (w === 1) {
+    // Arms: a 1-dot Bresenham line with every diagonal step filled in, so it
+    // reads a touch heavier than 1 dot (and lighter than the 2-dot legs).
+    // Columns round away from the center line so mirrored poses stay mirrored.
+    let c0 = C + symCell(p[a]);
+    let r0 = Math.round(GRID - p[a + 1] - 0.5);
+    const c1 = C + symCell(p[b]);
+    const r1 = Math.round(GRID - p[b + 1] - 0.5);
+    const dc = Math.abs(c1 - c0);
+    const dr = -Math.abs(r1 - r0);
+    const sc = c0 < c1 ? 1 : -1;
+    const sr = r0 < r1 ? 1 : -1;
+    let err = dc + dr;
+    for (let i = 0; i < 64; i++) {
+      plot(grid, c0, r0, 1);
+      if (c0 === c1 && r0 === r1) break;
+      const e2 = 2 * err;
+      const stepC = e2 >= dr;
+      const stepR = e2 <= dc;
+      if (stepC) {
+        err += dr;
+        c0 += sc;
+      }
+      if (stepR) {
+        err += dc;
+        if (stepC) plot(grid, c0, r0, 1);
+        r0 += sr;
+      }
+    }
+    return;
+  }
   const dx = p[b] - p[a];
   const du = p[b + 1] - p[a + 1];
   const n = Math.max(1, Math.ceil(Math.hypot(dx, du) * 2));
-  for (let i = 0; i <= n; i++) stamp(grid, p[a] + (dx * i) / n, p[a + 1] + (du * i) / n, 2);
+  for (let i = 0; i <= n; i++) stamp(grid, p[a] + (dx * i) / n, p[a + 1] + (du * i) / n, w);
 }
 
 /** Two-bone IK: writes the middle joint and the (reach-clamped) end into p. */
@@ -514,6 +566,48 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     }
   }
 
+  // Whole-body inertia: when the body is jolted the hips shift a little, the
+  // chest more and the head most, while the arms trail behind and the knees
+  // give, so a knock travels through the entire figure instead of one side.
+  const rc = Math.max(-1.3, Math.min(1.3, p.recoil)) * m;
+  const fl = Math.max(0, Math.min(1, p.flail)) * m;
+  const jit = Math.sin(tq * 23 + p.seed * 5);
+  if (lie) {
+    // Lying down the jolt runs along the body: the head and chest shove
+    // toward the wall and spring back, the knees fold up.
+    const along = rc * lieDir;
+    headDU += Math.round(along * 1.5);
+    torso += along;
+    crouch += Math.abs(rc) * 0.4 + fl * 0.6;
+    armL += fl * (1 + jit * 0.6);
+    armR += fl * (1 - jit * 0.6);
+  } else {
+    hipX += rc * 0.9;
+    chestDX += rc * 2.2;
+    headDX += Math.round(rc * 1.2);
+    if (Math.abs(rc) > 0.55) headDU -= 1;
+    armL += rc * 0.9;
+    armR -= rc * 0.9;
+    bendL += rc * 0.5;
+    bendR -= rc * 0.5;
+    crouch += Math.abs(rc) * 0.25 + fl * 0.5;
+    // Flail: arms thrown out, legs splayed, a staggering step to catch himself.
+    armL += fl * (1.5 + jit * 0.5);
+    armR += fl * (1.5 - jit * 0.5);
+    bendL += fl * jit * 0.8;
+    bendR -= fl * jit * 0.8;
+    spread += fl * 1.5;
+    if (grounded && fl > 0.15) {
+      if (rc >= 0) {
+        footRX += fl * 2.5;
+        footRU += fl * 2;
+      } else {
+        footLX -= fl * 2.5;
+        footLU += fl * 2;
+      }
+    }
+  }
+
   // Breathing: the chest rises one dot on each breath.
   if (!walking && grounded && lively) torso += Math.sin(t * 2.3 + p.seed) > 0.35 ? 1 : 0;
 
@@ -619,14 +713,14 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     const kk = Math.max(1 / len, Math.min(1 - s / 2 / len, k));
     stamp(grid, tx0 + (tx1 - tx0) * kk, tu0 + (tu1 - tu0) * kk, s);
   }
-  bone(grid, pt, SH_L, ELB_L);
-  bone(grid, pt, ELB_L, HAND_L);
-  bone(grid, pt, SH_R, ELB_R);
-  bone(grid, pt, ELB_R, HAND_R);
-  bone(grid, pt, HIP_L, KNEE_L);
-  bone(grid, pt, KNEE_L, FOOT_L);
-  bone(grid, pt, HIP_R, KNEE_R);
-  bone(grid, pt, KNEE_R, FOOT_R);
+  bone(grid, pt, HIP_L, KNEE_L, THIGH_W);
+  bone(grid, pt, KNEE_L, FOOT_L, LEG_W);
+  bone(grid, pt, HIP_R, KNEE_R, THIGH_W);
+  bone(grid, pt, KNEE_R, FOOT_R, LEG_W);
+  bone(grid, pt, SH_L, ELB_L, ARM_W);
+  bone(grid, pt, ELB_L, HAND_L, ARM_W);
+  bone(grid, pt, SH_R, ELB_R, ARM_W);
+  bone(grid, pt, ELB_R, HAND_R, ARM_W);
 
   // Toes point outward (or ahead when walking) on feet that touch the floor.
   if (toes && !lie) {
@@ -636,8 +730,8 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
       'worklet';
       return x > -p.roomL + 0.5 && x < p.roomR - 0.5;
     };
-    const tl = pt[FOOT_L] + toeL * 1.5;
-    const tr = pt[FOOT_R] + toeR * 1.5;
+    const tl = pt[FOOT_L] + toeL * (LEG_W / 2 + 0.5);
+    const tr = pt[FOOT_R] + toeR * (LEG_W / 2 + 0.5);
     if (pt[FOOT_L + 1] < 1.5 && toeFits(tl)) stamp(grid, tl, pt[FOOT_L + 1] - 0.5, 1);
     if (pt[FOOT_R + 1] < 1.5 && toeFits(tr)) stamp(grid, tr, pt[FOOT_R + 1] - 0.5, 1);
   }

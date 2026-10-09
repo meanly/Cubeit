@@ -83,7 +83,7 @@ export function TalkPanel() {
         {entries.map((e) => (
           <Animated.View key={e.id} entering={FadeInDown.duration(180)} style={e.from === 'user' ? styles.rowUser : styles.rowChar}>
             <View style={[styles.bubble, e.from === 'user' ? styles.bubbleUser : styles.bubbleChar]}>
-              <Text style={[styles.bubbleText, e.from === 'user' && { color: '#FFFFFF' }]}>{e.text}</Text>
+              <Text style={[styles.bubbleText, e.from === 'user' && { color: colors.onAccent }]}>{e.text}</Text>
             </View>
             {e.reply?.proposal && (
               <ProposalCard
@@ -139,7 +139,7 @@ export function TalkPanel() {
           icon="arrow-up"
           label="Send"
           onPress={() => send(text)}
-          color="#FFFFFF"
+          color={colors.onAccent}
           style={[styles.send, (!text.trim() || busy) && { opacity: 0.4 }]}
         />
       </View>
@@ -163,7 +163,7 @@ function ProposalCard({
   return (
     <View style={styles.proposal}>
       <View style={styles.proposalHead}>
-        <Ionicons name="bookmark" size={14} color={colors.glow} />
+        <Ionicons name="bookmark" size={14} color={colors.accent} />
         <Text style={styles.proposalLabel}>Save as a memory?</Text>
       </View>
       <Text style={styles.proposalContent}>“{content}”</Text>
@@ -204,7 +204,13 @@ const styles = StyleSheet.create({
   rowChar: { alignItems: 'flex-start' },
   bubble: { maxWidth: '82%', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 },
   bubbleUser: { backgroundColor: colors.accent, borderBottomRightRadius: 6 },
-  bubbleChar: { backgroundColor: colors.surfaceRaised, borderBottomLeftRadius: 6 },
+  bubbleChar: {
+    backgroundColor: colors.surfaceRaised,
+    borderBottomLeftRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.line,
+    borderTopColor: colors.lineStrong,
+  },
   bubbleText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.text },
   typing: { fontFamily: fonts.medium, fontSize: 13, color: colors.textFaint },
   suggestion: { marginTop: 6 },
@@ -216,14 +222,14 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 23,
     paddingHorizontal: 18,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(0,0,0,0.25)',
     borderWidth: 1,
     borderColor: colors.line,
     color: colors.text,
     fontFamily: fonts.regular,
     fontSize: 15,
   },
-  send: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.accent },
+  send: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.accent, borderColor: colors.accent, borderTopColor: 'rgba(255,255,255,0.55)' },
   proposal: {
     marginTop: 6,
     maxWidth: '88%',
@@ -235,7 +241,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   proposalHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  proposalLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.glow },
+  proposalLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.accent },
   proposalContent: { fontFamily: fonts.regular, fontSize: 14, color: colors.text, lineHeight: 20 },
   warning: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, color: colors.warning },
   proposalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },

@@ -12,12 +12,12 @@ export function CubeMark({ size = 22 }: { size?: number }) {
       <Defs>
         <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor={colors.accentStrong} />
-          <Stop offset="1" stopColor={colors.blue} />
+          <Stop offset="1" stopColor="#5FC9B8" />
         </LinearGradient>
       </Defs>
       <Path d="M16 2.5 L28 9 V23 L16 29.5 L4 23 V9 Z" fill={`url(#${id})`} />
       <Path d="M16 2.5 L28 9 L16 15.5 L4 9 Z" fill="#FFFFFF" opacity={0.22} />
-      <Path d="M11 17.5 v3 M21 17.5 v3" stroke="#14123A" strokeWidth={2.6} strokeLinecap="round" />
+      <Path d="M11 17.5 v3 M21 17.5 v3" stroke={colors.onAccent} strokeWidth={2.6} strokeLinecap="round" />
     </Svg>
   );
 }

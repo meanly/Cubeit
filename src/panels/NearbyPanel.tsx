@@ -73,7 +73,7 @@ export function NearbyPanel() {
 
         {phase === 'searching' && (
           <Animated.View entering={FadeIn} style={styles.center}>
-            <Ionicons name="radio-outline" size={34} color={colors.glow} />
+            <Ionicons name="radio-outline" size={34} color={colors.accent} />
             <Text style={styles.body}>Looking for cubelings… (simulated)</Text>
             <Button
               label="Cancel"
@@ -108,7 +108,7 @@ export function NearbyPanel() {
 function Bullet({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
   return (
     <View style={styles.bullet}>
-      <Ionicons name={icon} size={18} color={colors.glow} />
+      <Ionicons name={icon} size={18} color={colors.accent} />
       <Text style={styles.bulletText}>{text}</Text>
     </View>
   );

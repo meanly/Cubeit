@@ -5,6 +5,7 @@ import Animated, { FadeInUp, FadeOutUp, LinearTransition } from 'react-native-re
 
 import { useUi, type Toast } from '../state/uiStore';
 import { colors, fonts, radii } from '../theme/tokens';
+import { Glass } from './Glass';
 import { PressableScale } from './primitives';
 
 /** Small, non-blocking notices (rewards, milestones, problems). */
@@ -35,9 +36,10 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast.id]);
   const icon = toast.tone === 'reward' ? 'sparkles' : toast.tone === 'warning' ? 'alert-circle' : 'information-circle';
-  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.warning : colors.glow;
+  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.warning : colors.accent;
   return (
-    <Animated.View entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(180)} layout={LinearTransition} style={styles.toast}>
+    <Animated.View entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(180)} layout={LinearTransition} style={styles.shadow}>
+      <Glass radius={22} native={false} style={styles.toast}>
       <Ionicons name={icon} size={18} color={tint} />
       <Text style={styles.text} accessibilityLiveRegion="polite">
         {toast.text}
@@ -54,6 +56,7 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
           <Text style={styles.actionText}>{toast.action.label}</Text>
         </PressableScale>
       )}
+      </Glass>
     </Animated.View>
   );
 }
@@ -64,14 +67,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    maxWidth: 460,
     paddingLeft: 14,
     paddingRight: 8,
     minHeight: 44,
+  },
+  shadow: {
+    maxWidth: 460,
     borderRadius: radii.lg,
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -79,6 +81,6 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   text: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, paddingVertical: 10 },
-  action: { paddingHorizontal: 12, height: 32, borderRadius: 16, backgroundColor: colors.accent, justifyContent: 'center' },
-  actionText: { fontFamily: fonts.bold, fontSize: 13, color: '#FFFFFF' },
+  action: { paddingHorizontal: 14, height: 32, borderRadius: 16, backgroundColor: colors.accent, justifyContent: 'center' },
+  actionText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 });

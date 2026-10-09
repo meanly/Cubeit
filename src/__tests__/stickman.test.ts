@@ -25,14 +25,14 @@ function bounds(grid: number[]) {
 }
 
 describe('pixel stickman', () => {
-  it('stands about 25 dots tall with its feet on the bottom row', () => {
+  it('stands about 28 dots tall with its feet on the bottom row', () => {
     const b = bounds(rasterStickman(IDLE_INPUT).grid);
     expect(b.bottom).toBe(GRID - 1);
-    expect(b.h).toBeGreaterThanOrEqual(24);
+    expect(b.h).toBeGreaterThanOrEqual(27);
     expect(b.h).toBeLessThanOrEqual(GRID);
   });
 
-  it('is built thick: a solid 4-dot head with no face and 2-dot legs', () => {
+  it('has a solid 4-dot head with no face, thin arms and chunky legs', () => {
     const { grid } = rasterStickman(IDLE_INPUT);
     const rowWidth = (r: number) => grid.slice(r * GRID, (r + 1) * GRID).filter((c) => c !== 0).length;
     const top = Math.min(...cells(grid).map(([, y]) => y));
@@ -40,6 +40,46 @@ describe('pixel stickman', () => {
     expect([rowWidth(top), rowWidth(top + 1), rowWidth(top + 2)]).toEqual([2, 4, 4]);
     // Shins: two 2-dot columns.
     expect(rowWidth(GRID - 4)).toBe(4);
+    // Arms: slim solid lines, a single stair-stepped line, never more than 3 dots across in a row.
+    for (let r = top + 8; r <= top + 11; r++) {
+      const row = grid.slice(r * GRID, (r + 1) * GRID);
+      let run = 0;
+      let longest = 0;
+      row.forEach((c, x) => {
+        run = c !== 0 && (x < GRID / 2 - 2 || x > GRID / 2 + 1) ? run + 1 : 0;
+        longest = Math.max(longest, run);
+      });
+      expect(longest).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('throws its whole body with recoil: hips, chest and head all shift, arms trail', () => {
+    const rest = rasterStickman(IDLE_INPUT).grid;
+    const hit = draw({ recoil: 1, motion: 1 }).grid;
+    // Median column of a band of rows (robust to a stray hand passing through it).
+    const centroid = (grid: number[], r0: number, r1: number) => {
+      const xs = cells(grid)
+        .filter(([, y]) => y >= r0 && y <= r1)
+        .map(([x]) => x)
+        .sort((a, b) => a - b);
+      return xs[Math.floor(xs.length / 2)];
+    };
+    const top = Math.min(...cells(rest).map(([, y]) => y));
+    // Head, chest and hips each move right, and the higher up, the further.
+    const head = centroid(hit, top, top + 3) - centroid(rest, top, top + 3);
+    const chest = centroid(hit, top + 5, top + 9) - centroid(rest, top + 5, top + 9);
+    expect(head).toBeGreaterThan(1);
+    expect(chest).toBeGreaterThan(0.5);
+    // The feet stay planted.
+    expect(centroid(hit, GRID - 2, GRID - 1)).toBeCloseTo(centroid(rest, GRID - 2, GRID - 1), 0);
+  });
+
+  it('flails after a hard knock: arms thrown up beside the head', () => {
+    const top = Math.min(...cells(draw({}).grid).map(([, y]) => y));
+    // Lit dots level with the head but outside its 4 columns are hands.
+    const raised = (grid: number[]) => cells(grid).filter(([x, y]) => y <= top + 4 && (x < GRID / 2 - 2 || x > GRID / 2 + 1)).length;
+    expect(raised(draw({}).grid)).toBe(0);
+    expect(raised(draw({ flail: 1 }).grid)).toBeGreaterThan(2);
   });
 
   it('is symmetric at rest', () => {

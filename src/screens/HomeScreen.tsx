@@ -18,6 +18,8 @@ import { TiltSensorHost } from '../sensors/TiltSensorHost';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 import { colors } from '../theme/tokens';
+import { Ambient } from '../ui/Ambient';
+import { GlassBackdrop, GlassRoot } from '../ui/Glass';
 import { Toasts } from '../ui/Toasts';
 import { ActionBar, ACTION_BAR_HEIGHT } from './ActionBar';
 import { Header, HEADER_HEIGHT } from './Header';
@@ -30,7 +32,9 @@ const FRAME_RATIO = 0.065;
 export function HomeScreen() {
   return (
     <WorldProvider>
-      <HomeContent />
+      <GlassRoot>
+        <HomeContent />
+      </GlassRoot>
     </WorldProvider>
   );
 }
@@ -78,21 +82,28 @@ function HomeContent() {
   const busy = activeGame !== null || visitor !== null;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]} onLayout={onLayout}>
+    <View style={styles.root} onLayout={onLayout}>
       <TiltSensorHost />
-      <Header />
-      {ready && (
-        <Animated.View
-          style={[styles.roomWrap, { top: roomTop, left: (root.w - frameW) / 2, width: frameW, height: frameH }, roomStyle]}
-        >
-          <View style={[styles.frame, { padding: border - 1, borderRadius: border * 1.3 }]}>
-            <Room width={roomW} height={roomH} overlay={<GameHud />}>
-              {visitor && <VisitorLayer roomWidth={roomW} roomHeight={roomH} />}
-              <GameHost roomWidth={roomW} roomHeight={roomH} />
-            </Room>
-          </View>
-        </Animated.View>
-      )}
+      {/* Everything glass surfaces frost: the ambient light and the room. */}
+      <GlassBackdrop style={StyleSheet.absoluteFill}>
+        <Ambient />
+        {ready && (
+          <Animated.View
+            style={[styles.roomWrap, { top: roomTop, left: (root.w - frameW) / 2, width: frameW, height: frameH }, roomStyle]}
+          >
+            <View style={[styles.frame, { padding: border - 1, borderRadius: border * 1.5 }]}>
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.frameRim, { borderRadius: border * 1.5 }]} />
+              <Room width={roomW} height={roomH} overlay={<GameHud />}>
+                {visitor && <VisitorLayer roomWidth={roomW} roomHeight={roomH} />}
+                <GameHost roomWidth={roomW} roomHeight={roomH} />
+              </Room>
+            </View>
+          </Animated.View>
+        )}
+      </GlassBackdrop>
+      <View style={[styles.header, { top: insets.top }]} pointerEvents="box-none">
+        <Header />
+      </View>
       <View style={[styles.actions, { bottom: insets.bottom }]}>
         <ActionBar disabled={busy} />
       </View>
@@ -116,15 +127,22 @@ const styles = StyleSheet.create({
   // 'clip' (web) also prevents focus changes from scrolling the clipped content.
   root: { flex: 1, backgroundColor: colors.bg, overflow: Platform.OS === 'web' ? ('clip' as ViewStyle['overflow']) : 'hidden' },
   roomWrap: { position: 'absolute', transformOrigin: '50% 0%' },
-  // Placeholder border around the LCD (plain dark plastic); restyle freely.
+  header: { position: 'absolute', left: 0, right: 0 },
+  // A clear glass slab around the LCD: frosted edge, bright rim on top.
   frame: {
     flex: 1,
-    backgroundColor: '#1A1C21',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    shadowColor: '#000',
+    shadowOpacity: 0.55,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 12,
+  },
+  frameRim: {
     borderWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.10)',
-    borderLeftColor: 'rgba(255,255,255,0.06)',
-    borderRightColor: 'rgba(0,0,0,0.35)',
-    borderBottomColor: 'rgba(0,0,0,0.45)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: colors.specular,
+    borderLeftColor: 'rgba(255,255,255,0.16)',
   },
   actions: { position: 'absolute', left: 0, right: 0 },
 });

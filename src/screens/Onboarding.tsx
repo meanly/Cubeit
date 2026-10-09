@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { DEFAULT_NAME } from '../state/schema';
 import { useGame } from '../state/gameStore';
 import { colors, fonts, radii } from '../theme/tokens';
+import { Glass } from '../ui/Glass';
 import { Button } from '../ui/primitives';
 import { Wordmark } from '../ui/Wordmark';
 
@@ -19,7 +20,7 @@ export function Onboarding() {
   return (
     <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(300)} style={styles.scrim}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.center}>
-        <View style={styles.card}>
+        <Glass radius={radii.xl + 4} strong native={false} style={styles.card}>
           <Wordmark size={22} />
           {step === 'name' ? (
             <>
@@ -56,7 +57,7 @@ export function Onboarding() {
               />
             </>
           )}
-        </View>
+        </Glass>
       </KeyboardAvoidingView>
     </Animated.View>
   );
@@ -77,12 +78,8 @@ const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
   center: { flex: 1, justifyContent: 'flex-end', padding: 16 },
   card: {
-    backgroundColor: colors.bgRaised,
-    borderRadius: radii.xl,
     padding: 22,
     gap: 14,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
     marginBottom: 24,
     maxWidth: 520,
     width: '100%',
@@ -93,9 +90,9 @@ const styles = StyleSheet.create({
   input: {
     height: 50,
     borderRadius: radii.md,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(0,0,0,0.25)',
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: colors.line,
     paddingHorizontal: 16,
     fontFamily: fonts.bold,
     fontSize: 18,
@@ -103,7 +100,7 @@ const styles = StyleSheet.create({
   },
   tip: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   tipNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.glow },
+  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.accent },
   tipText: { flex: 1, fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.textDim },
   privacy: { fontFamily: fonts.medium, fontSize: 13, color: colors.textFaint },
 });

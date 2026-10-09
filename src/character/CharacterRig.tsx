@@ -13,7 +13,21 @@ import type { CharacterState } from './states';
 
 export type RigBody = Pick<
   BodyState,
-  'x' | 'z' | 'y' | 'vx' | 'vy' | 'facing' | 'walkPhase' | 'walking' | 'squash' | 'lean' | 'anchored' | 'fallen' | 'fallDir'
+  | 'x'
+  | 'z'
+  | 'y'
+  | 'vx'
+  | 'vy'
+  | 'facing'
+  | 'walkPhase'
+  | 'walking'
+  | 'squash'
+  | 'lean'
+  | 'recoil'
+  | 'flail'
+  | 'anchored'
+  | 'fallen'
+  | 'fallDir'
 >;
 
 interface Props {
@@ -86,6 +100,8 @@ export const CharacterRig = memo(function CharacterRig({
       wave: pose.wave.value,
       lookX: pose.lookX.value,
       spin: pose.spin.value,
+      recoil: b.recoil,
+      flail: b.flail,
     });
   }, [st, acc, motion, seed]);
 

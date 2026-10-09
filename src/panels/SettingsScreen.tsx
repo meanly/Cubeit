@@ -19,6 +19,7 @@ import { colors, fonts, radii } from '../theme/tokens';
 import { confirm, ConfirmHost } from '../ui/Confirm';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Slider } from '../ui/Slider';
+import { Ambient } from '../ui/Ambient';
 import { Toasts } from '../ui/Toasts';
 
 export function SettingsScreen() {
@@ -53,6 +54,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
 
   return (
     <View style={[styles.flex, styles.screen, { paddingTop: insets.top }]}>
+      <Ambient />
       <View style={styles.header}>
         <Text style={styles.title} accessibilityRole="header">
           Settings
@@ -309,7 +311,15 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, gap: 18 },
   section: { gap: 8 },
   sectionTitle: { fontFamily: fonts.medium, fontSize: 12, color: colors.textFaint, textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4 },
-  card: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 14, gap: 12 },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderTopColor: colors.lineStrong,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   rowLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.textDim },
@@ -321,7 +331,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderWidth: 1,
+    borderColor: colors.line,
     paddingHorizontal: 14,
     color: colors.text,
     fontFamily: fonts.bold,

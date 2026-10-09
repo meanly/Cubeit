@@ -37,12 +37,12 @@ export const FLOOR_DOTS = 6;
 const BODY_HALF = 3 / LCD_DOTS;
 
 export const WORLD = {
-  /** The stickman stands 25 dots tall; hit-testing uses a 12-dot-wide box. */
-  charHeight: 25 / LCD_DOTS,
+  /** The stickman stands 28 dots tall; hit-testing uses a 12-dot-wide box. */
+  charHeight: 28 / LCD_DOTS,
   charWidth: 12 / LCD_DOTS,
-  /** Lying down (knocked over): 5 dots tall, 25 long, centered on x. */
+  /** Lying down (knocked over): 5 dots tall, 28 long, centered on x. */
   lieHeight: 5 / LCD_DOTS,
-  lieHalf: 12.5 / LCD_DOTS,
+  lieHalf: 14 / LCD_DOTS,
   xMin: BODY_HALF,
   xMax: 1 - BODY_HALF,
   zMin: 0,

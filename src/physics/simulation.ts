@@ -32,6 +32,16 @@ export const PHYS = {
   /** Tipping the screen's top edge down this far flips gravity toward the ceiling (and back below flipOff). */
   flipOn: 0.6,
   flipOff: 0.35,
+  /** Whole-body recoil spring: stiffness, damping (underdamped, so it wobbles back), */
+  recoilK: 120,
+  recoilDamp: 5.5,
+  /** how strongly velocity changes throw the upper body, */
+  recoilInertia: 4,
+  /** and how hard a wall knocks it back (per unit of impact speed). */
+  recoilKick: 12,
+  /** Impact speed above which the stickman is knocked off his feet and flails. */
+  knockHop: 0.9,
+  flailDecay: 1.5,
 } as const;
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -132,6 +142,31 @@ function stepSquash(b: BodyState, dt: number): void {
   b.squash = clamp(b.squash + b.squashV * dt, -0.35, 0.45);
 }
 
+/**
+ * Whole-body follow-through. `dvx` is this step's change in sideways velocity
+ * from forces (the upper body lags behind it); collisions add `kick` directly.
+ */
+function stepRecoil(b: BodyState, dvx: number, kick: number, dt: number, reduceMotion: number): void {
+  'worklet';
+  if (reduceMotion === 1) {
+    b.recoil = 0;
+    b.recoilV = 0;
+    b.flail = 0;
+    return;
+  }
+  b.recoilV += -dvx * PHYS.recoilInertia + kick;
+  b.recoilV += (-PHYS.recoilK * b.recoil - PHYS.recoilDamp * b.recoilV) * dt;
+  b.recoil = clamp(b.recoil + b.recoilV * dt, -1.4, 1.4);
+  if (Math.abs(b.recoil) >= 1.4) b.recoilV *= 0.5;
+  b.flail = Math.max(0, b.flail - dt * PHYS.flailDecay);
+}
+
+/** A hard knock: flail for a moment (strength 0..1). */
+function knock(b: BodyState, strength: number): void {
+  'worklet';
+  b.flail = Math.max(b.flail, clamp(strength, 0, 1));
+}
+
 export function stepBody(
   b: BodyState,
   t: TiltState,
@@ -148,11 +183,15 @@ export function stepBody(
     b.vy = 0;
     b.speed = 0;
     b.walking = 0;
+    stepRecoil(b, 0, 0, dt, p.reduceMotion);
     return;
   }
   if (b.held === 1) {
+    // Swinging him around on a finger throws his whole body about.
+    const vx0 = b.vx;
     stepHeld(b, g, dt);
     stepSquash(b, dt);
+    stepRecoil(b, (b.vx - vx0) * 0.6, 0, dt, p.reduceMotion);
     return;
   }
 
@@ -194,10 +233,12 @@ export function stepBody(
       b.walking = 0;
       b.lean *= 1 - Math.min(1, dt * 6);
       stepSquash(b, dt);
+      stepRecoil(b, 0, 0, dt, p.reduceMotion);
       return;
     }
   }
 
+  const vx0 = b.vx;
   const gdir = b.gUp === 1 ? -1 : 1;
   const grounded = b.y <= 0.0001 && b.vy <= 0 && gdir > 0;
   const airFactor = grounded ? 1 : 0.35;
@@ -247,6 +288,7 @@ export function stepBody(
         events.push(PhysicsEvent.Land, impact, now - b.airborneFrom);
       }
       if (p.reduceMotion === 0) b.squashV += impact * 1.4;
+      if (impact > 1.6) knock(b, (impact - 1.6) * 0.8);
       b.vy = impact > 1.6 ? impact * 0.22 : 0;
     }
     if (b.y >= yMax) {
@@ -256,6 +298,7 @@ export function stepBody(
         b.lastBumpAt = now;
         events.push(PhysicsEvent.Bump, impact, 4);
         if (p.reduceMotion === 0) b.squashV += impact * 1.2;
+        knock(b, impact * 0.5);
       }
       // Pressed against the ceiling while gravity points up; otherwise bounce back down.
       b.vy = gdir < 0 ? 0 : -impact * 0.3;
@@ -265,6 +308,8 @@ export function stepBody(
   }
   b.onCeil = gdir < 0 && b.y >= yMax - 0.002 ? 1 : 0;
 
+  // Velocity change from forces only (walls are handled as knocks below).
+  const dvx = b.vx - vx0;
   b.x += b.vx * dt;
   b.z += b.vz * dt;
 
@@ -304,11 +349,21 @@ export function stepBody(
     }
     b.vz = -b.vz * PHYS.wallRestitution;
   }
+  let kick = 0;
   if (bumpSide >= 0 && bumpSpeed > PHYS.bumpThreshold) {
     if (p.reduceMotion === 0) {
       b.squashV -= bumpSpeed * 1.2;
-      // The head is knocked back from the wall.
-      if (bumpSide <= 1) b.lean = clamp(b.lean + (bumpSide === 0 ? 1 : -1) * Math.min(0.35, bumpSpeed * 0.3), -0.4, 0.4);
+      // The whole body is knocked back from a side wall: head and chest snap
+      // away, the arms fly, and on a hard hit his feet leave the floor.
+      if (bumpSide <= 1) {
+        kick = (bumpSide === 0 ? 1 : -1) * bumpSpeed * PHYS.recoilKick;
+        if (!lying && grounded && bumpSpeed > PHYS.knockHop) {
+          b.vy = Math.min(1.3, (bumpSpeed - PHYS.knockHop) * 1.4 + 0.5);
+          b.y = 0.001;
+          b.airborneFrom = now;
+        }
+      }
+      knock(b, (bumpSpeed - 0.5) * 1.1);
     }
     if (now - b.lastBumpAt > 0.35) {
       b.lastBumpAt = now;
@@ -328,6 +383,7 @@ export function stepBody(
   const leanTarget = b.walking === 1 ? clamp(b.vx * 0.3, -0.2, 0.2) : clamp(-t.x * 0.25, -0.3, 0.3);
   b.lean += (leanTarget - b.lean) * Math.min(1, dt * 8);
   stepSquash(b, dt);
+  stepRecoil(b, dvx, kick, dt, p.reduceMotion);
 }
 
 export function stepBall(ball: BallState, b: BodyState, t: TiltState, dt: number, now: number, events: number[]): void {

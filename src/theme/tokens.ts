@@ -1,33 +1,43 @@
 /**
- * Cubeit design tokens. The UI is deliberately quiet: a deep navy base, purple
- * and blue accents, soft glows. The room is where the color lives.
+ * Cubeit design tokens. Liquid-glass look: a near-black graphite base with
+ * soft ambient light behind it, frosted translucent surfaces with a bright
+ * specular edge, and one fresh lime accent that echoes the LCD's green glass.
+ * The room is where the color lives; the chrome stays neutral.
  */
 export const colors = {
-  bg: '#090B18',
-  bgRaised: '#0E1126',
-  surface: '#141933',
-  surfaceRaised: '#1B2144',
-  surfacePressed: '#252C58',
-  line: 'rgba(170, 178, 255, 0.10)',
-  lineStrong: 'rgba(170, 178, 255, 0.22)',
-  text: '#ECEEFF',
-  textDim: '#AEB3DA',
-  textFaint: '#7C83AE',
-  accent: '#8C7BFF',
-  accentStrong: '#A08FFF',
-  accentSoft: 'rgba(140, 123, 255, 0.18)',
-  blue: '#5B9DFF',
-  blueSoft: 'rgba(91, 157, 255, 0.16)',
-  glow: '#B6A6FF',
+  bg: '#070908',
+  bgRaised: '#101312',
+  /** Translucent fills: layered over glass or the backdrop. */
+  surface: 'rgba(255, 255, 255, 0.07)',
+  surfaceRaised: 'rgba(255, 255, 255, 0.11)',
+  surfacePressed: 'rgba(255, 255, 255, 0.18)',
+  /** Opaque fallback for glass where blur isn't available. */
+  glassFallback: 'rgba(22, 26, 24, 0.86)',
+  glassTint: 'rgba(18, 22, 20, 0.38)',
+  line: 'rgba(255, 255, 255, 0.08)',
+  lineStrong: 'rgba(255, 255, 255, 0.16)',
+  /** The bright rim along a glass surface's top edge. */
+  specular: 'rgba(255, 255, 255, 0.30)',
+  text: '#F3F6F1',
+  textDim: '#AEB5AB',
+  textFaint: '#7A8178',
+  accent: '#C8F169',
+  accentStrong: '#DBFF8C',
+  accentSoft: 'rgba(200, 241, 105, 0.16)',
+  /** Text and icons drawn on the accent. */
+  onAccent: '#12170B',
+  blue: '#7CC8FF',
+  blueSoft: 'rgba(124, 200, 255, 0.16)',
+  glow: '#DBFF8C',
   star: '#FFD36E',
-  success: '#6BE0B0',
+  success: '#7BE3B0',
   warning: '#FFC46B',
-  danger: '#FF6F8E',
-  dangerSoft: 'rgba(255, 111, 142, 0.14)',
-  scrim: 'rgba(5, 6, 16, 0.72)',
+  danger: '#FF7A85',
+  dangerSoft: 'rgba(255, 122, 133, 0.14)',
+  scrim: 'rgba(0, 0, 0, 0.55)',
 } as const;
 
-export const radii = { sm: 10, md: 14, lg: 20, xl: 28, pill: 999 } as const;
+export const radii = { sm: 12, md: 16, lg: 22, xl: 30, pill: 999 } as const;
 
 export const fonts = {
   regular: 'Nunito_600SemiBold',
@@ -48,13 +58,13 @@ export const type = {
   heading: { fontFamily: fonts.black, fontSize: 22 },
 } as const;
 
-/** Mood colors drive the glow behind the character and a faint tint in the room's light. */
+/** Mood colors drive the ambient light behind the room and the mood dot. */
 export const moodColors = {
   joyful: '#FFD36E',
   happy: '#9DF0C4',
   playful: '#7FD8FF',
-  content: '#B6A6FF',
-  calm: '#8FB4FF',
-  sleepy: '#7E86C9',
-  blue: '#8C9BD6',
+  content: '#C8F169',
+  calm: '#8FD0E8',
+  sleepy: '#8E9AAE',
+  blue: '#7E9CC4',
 } as const;

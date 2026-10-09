@@ -65,7 +65,7 @@ export function Button({
 }) {
   const bg =
     tone === 'primary' ? colors.accent : tone === 'danger' ? colors.dangerSoft : tone === 'secondary' ? colors.surfaceRaised : 'transparent';
-  const fg = tone === 'primary' ? '#FFFFFF' : tone === 'danger' ? colors.danger : tone === 'ghost' ? colors.textDim : colors.text;
+  const fg = tone === 'primary' ? colors.onAccent : tone === 'danger' ? colors.danger : tone === 'ghost' ? colors.textDim : colors.text;
   return (
     <PressableScale
       accessibilityRole="button"
@@ -78,7 +78,8 @@ export function Button({
         styles.button,
         compact && styles.buttonCompact,
         { backgroundColor: bg, opacity: disabled ? 0.45 : 1 },
-        tone === 'secondary' && styles.buttonBorder,
+        (tone === 'secondary' || tone === 'danger') && styles.buttonBorder,
+        tone === 'primary' && styles.buttonPrimary,
         style,
       ]}
     >
@@ -93,7 +94,7 @@ export function IconButton({
   onPress,
   label,
   size = 22,
-  color = colors.textDim,
+  color = colors.text,
   style,
 }: {
   icon: IconName;
@@ -134,8 +135,8 @@ export function Chip({
       onPress={onPress}
       style={[styles.chip, selected && styles.chipSelected]}
     >
-      {icon && <Ionicons name={icon} size={14} color={selected ? colors.text : colors.textDim} />}
-      <Text style={[styles.chipLabel, selected && { color: colors.text }]}>{label}</Text>
+      {icon && <Ionicons name={icon} size={14} color={selected ? colors.onAccent : colors.textDim} />}
+      <Text style={[styles.chipLabel, selected && { color: colors.onAccent }]}>{label}</Text>
     </PressableScale>
   );
 }
@@ -146,7 +147,7 @@ export function Toggle({ value, onChange, label }: { value: boolean; onChange: (
     progress.set(withTiming(value ? 1 : 0, { duration: 160 }));
   }, [value, progress]);
   const knob = useAnimatedStyle(() => ({ transform: [{ translateX: progress.value * 20 }] }));
-  const track = useAnimatedStyle(() => ({ opacity: 0.35 + progress.value * 0.65 }));
+  const track = useAnimatedStyle(() => ({ opacity: 0.55 + progress.value * 0.45 }));
   return (
     <PressableScale
       accessibilityRole="switch"
@@ -211,24 +212,38 @@ export function StarCount({ value, size = 14 }: { value: number; size?: number }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 46,
-    borderRadius: radii.md,
-    paddingHorizontal: 18,
+    minHeight: 48,
+    borderRadius: radii.pill,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  buttonCompact: { minHeight: 36, paddingHorizontal: 14, borderRadius: radii.sm },
-  buttonBorder: { borderWidth: 1, borderColor: colors.line },
+  buttonCompact: { minHeight: 38, paddingHorizontal: 16 },
+  // Glass rim: a brighter top edge.
+  buttonBorder: { borderWidth: 1, borderColor: colors.line, borderTopColor: colors.lineStrong },
+  buttonPrimary: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    borderTopColor: 'rgba(255,255,255,0.55)',
+    shadowColor: colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+  },
   buttonLabel: { fontFamily: fonts.bold, fontSize: 15 },
   buttonLabelCompact: { fontSize: 14 },
   iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderTopColor: colors.lineStrong,
   },
   chip: {
     flexDirection: 'row',
@@ -240,22 +255,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
+    borderTopColor: colors.lineStrong,
   },
-  chipSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  chipSelected: { backgroundColor: colors.accent, borderColor: colors.accent, borderTopColor: 'rgba(255,255,255,0.55)' },
   chipLabel: { ...type.label, color: colors.textDim },
   toggle: { width: 48, height: 28, justifyContent: 'center' },
   toggleTrack: { ...StyleSheet.absoluteFill, borderRadius: 14 },
-  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', marginLeft: 2 },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    marginLeft: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
   segmented: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderRadius: radii.pill,
     padding: 3,
     borderWidth: 1,
     borderColor: colors.line,
   },
-  segment: { flex: 1, minHeight: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  segmentSelected: { backgroundColor: colors.surfacePressed },
+  segment: { flex: 1, minHeight: 34, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
+  segmentSelected: {
+    backgroundColor: colors.surfacePressed,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.line,
+    borderTopColor: colors.specular,
+  },
   segmentLabel: { ...type.label, color: colors.textDim },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 8 },
   sectionText: { ...type.caption, color: colors.textFaint, textTransform: 'uppercase', letterSpacing: 1 },
