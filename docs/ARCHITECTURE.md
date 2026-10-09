@@ -85,8 +85,11 @@
   `CharacterRig` only feeds it shared values and places the sprite.
   The rest pose is the toy's 21-dot figure, dot for dot (a test pins it).
   A hard sideways tilt makes that wall "down": `BodyState.rot` topples him
-  like a pole, he thuds flat, crumples head-first into the corner while the
-  tilt holds, and springs back up after.
+  like a pole, he thuds flat and crumples head-first into the corner; if the
+  tilt keeps that wall "down" (`PHYS.wallOn`), he rolls over onto his feet and
+  stands on the wall (`BodyState.wall`, rot ±3π/2), with his speech bubble and
+  emotes turned to match (`CharacterOverlay`). Easing the tilt (`wallOff`)
+  pivots him back onto the floor.
   Knocks read through the whole body: the physics keeps a `recoil` spring
   (driven by every velocity change, kicked by wall hits) and a decaying
   `flail`, which the sprite spreads across hips, chest, head, arms and knees.
@@ -98,8 +101,17 @@
   icons (`ui/Icons`) as the fallback. The top bar is the
   logo plus a notifications bell (the activity log, unread since
   `progress.notificationsSeenAt`). The LCD sits in a little gadget
-  (`screens/DeviceFrame.tsx`); stats and Play / Customize / Friends live
-  under it (`screens/HomeCards.tsx`). Colors live in `theme/tokens.ts`.
+  (`screens/DeviceFrame.tsx`) whose color is a room setting
+  (`room.device`, catalog in `content/devices.ts`; Auto follows light / dark);
+  stats and Play / Customize / Friends live
+  under it (`screens/HomeCards.tsx`).
+- **Light / dark**: `theme/tokens.ts` holds `lightColors` and `darkColors`;
+  `ThemeProvider` (`theme/theme.tsx`) picks one from `settings.appearance`
+  (System / Light / Dark). UI never imports a palette: components call
+  `useColors()`, and styles are module-level factories
+  (`const makeStyles = (colors: Colors) => StyleSheet.create({...})`) read with
+  `useStyles(makeStyles)`, rebuilt only when the palette changes. The LCD and
+  its pixel art use their own palette and look the same in both modes.
 - **New behavior**: add a `Behavior` in `brain/behaviors.ts` and a weight in
   `choose()`. Use `ctx.wait` / `ctx.walkTo` so it stays interruptible.
 - **New game**: a scene component (reads `useWorld()`), registered in

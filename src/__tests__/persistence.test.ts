@@ -39,6 +39,16 @@ describe('save migration and repair', () => {
     expect(migrateSave(bad, 2_000).data.settings.appearance).toBe('system');
   });
 
+  it('v4 saves get the Auto device; unknown device colors are repaired', () => {
+    const old = createDefaultSave(1_000) as unknown as Record<string, any>;
+    old.version = 4;
+    delete old.room.device;
+    expect(migrateSave(JSON.parse(JSON.stringify(old)), 2_000).data.room.device).toBe('auto');
+    const bad = createDefaultSave(1_000) as unknown as Record<string, any>;
+    bad.room.device = 'plaid';
+    expect(migrateSave(bad, 2_000).data.room.device).toBe('auto');
+  });
+
   it('recovers from garbage with sensible defaults', () => {
     const { data } = migrateSave('not an object', 5_000);
     expect(data.version).toBe(SAVE_VERSION);

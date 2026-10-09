@@ -53,6 +53,11 @@ export const PHYS = {
   /** and the extra pull toward the wall a hard sideways tilt adds while he's down. */
   sideGravity: 5,
   lyingFriction: 1.1,
+  /** Standing on a side wall: how long he stays crumpled in the corner first, */
+  wallStandAfter: 0.7,
+  /** the sideways tilt that keeps the wall "down" (enter above `wallOn`, leave below `wallOff`), */
+  wallOn: 0.78,
+  wallOff: 0.45,
 } as const;
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -146,6 +151,9 @@ function stepHeld(b: BodyState, g: RoomGeometry, dt: number): void {
   // Picked up, he's righted at once.
   b.rot = 0;
   b.rotV = 0;
+  b.wall = 0;
+  b.wallBlend = 0;
+  b.wallT = 0;
   b.onCeil = 0;
   b.lean += (clamp(-b.vx * 0.25, -0.35, 0.35) - b.lean) * Math.min(1, dt * 10);
 }
@@ -192,10 +200,19 @@ export function bodyHalfX(rot: number): number {
  * (slow at first, faster as he tips), thuds and bounces when he lands, and
  * springs back otherwise (settling out of the corner, getting up).
  */
-function stepRot(b: BodyState, target: number, dt: number, now: number, events: number[], reduceMotion: number): void {
+function stepRot(
+  b: BodyState,
+  target: number,
+  dt: number,
+  now: number,
+  events: number[],
+  reduceMotion: number,
+  deliberate: boolean,
+): void {
   'worklet';
   const err = target - b.rot;
-  const toppling = target !== 0 && Math.abs(target) > Math.abs(b.rot) + 0.01;
+  // A deliberate move (rolling onto the wall) is the controlled spring, never a free fall.
+  const toppling = !deliberate && target !== 0 && Math.abs(target) > Math.abs(b.rot) + 0.01;
   if (toppling) {
     const dir = err > 0 ? 1 : -1;
     const before = Math.abs(b.rot);
@@ -214,9 +231,10 @@ function stepRot(b: BodyState, target: number, dt: number, now: number, events: 
       }
     }
     if (landed) {
-      // Bounce a little off the floor / wall.
+      // Bounce a little off the floor / wall; a gentle landing just comes to rest
+      // (otherwise long frames keep it micro-bouncing and it never settles).
       b.rot = target;
-      b.rotV = -b.rotV * 0.28;
+      b.rotV = impact > 1.5 ? -b.rotV * 0.28 : 0;
     }
   } else {
     b.rotV += (err * PHYS.rotK - b.rotV * PHYS.rotDamp) * dt;
@@ -295,6 +313,8 @@ export function stepBody(
       b.lean *= 1 - Math.min(1, dt * 6);
       b.rot = 0;
       b.rotV = 0;
+      b.wall = 0;
+      b.wallBlend = 0;
       stepSquash(b, dt);
       stepRecoil(b, 0, 0, dt, p.reduceMotion);
       return;
@@ -450,17 +470,41 @@ export function stepBody(
   const leanTarget = b.walking === 1 ? clamp(b.vx * 0.3, -0.2, 0.2) : clamp(-t.x * 0.25, -0.3, 0.3);
   b.lean += (leanTarget - b.lean) * Math.min(1, dt * 8);
 
-  // Toppling over, crumpling head-first into the corner, getting back up.
+  // Toppling over, crumpling head-first into the corner, then — while the tilt
+  // holds that wall "down" — rolling over onto his feet to stand on it.
   let target = 0;
-  if (b.fallen > 0) {
+  let deliberate = false;
+  if (b.wall !== 0) {
+    if (p.tiltEnabled === 0 || b.gUp === 1 || t.x * b.wall < PHYS.wallOff) {
+      // The tilt eased: the floor is the floor again. He's already on his feet,
+      // so he just pivots back down onto it (3π/2 and -π/2 are the same pose).
+      b.rot -= b.wall * Math.PI * 2;
+      b.wall = 0;
+      b.fallen = 0;
+    } else {
+      target = b.wall * Math.PI * 1.5;
+      deliberate = true;
+    }
+  } else if (b.fallen > 0) {
     const dir = b.fallDir >= 0 ? 1 : -1;
     target = dir * (Math.PI / 2);
     // Near the wall he's falling toward (a little slack so he doesn't flicker in and out).
     const atWall = dir > 0 ? b.x >= xMax - 0.03 : b.x <= xMin + 0.03;
     const hard = p.tiltEnabled === 1 && b.gUp === 0 ? clamp((Math.abs(t.x) - 0.6) / 0.35, 0, 1) : 0;
     if (atWall && t.x * dir > 0) target += dir * PHYS.cornerTip * hard;
+    const settled = atWall && t.x * dir > PHYS.wallOn && Math.abs(b.rotV) < 0.6 && Math.abs(b.rot - target) < 0.12;
+    b.wallT = settled ? b.wallT + dt : 0;
+    if (b.wallT > PHYS.wallStandAfter) {
+      b.wall = dir;
+      b.wallT = 0;
+      target = dir * Math.PI * 1.5;
+      deliberate = true;
+    }
+  } else {
+    b.wallT = 0;
   }
-  stepRot(b, target, dt, now, events, p.reduceMotion);
+  stepRot(b, target, dt, now, events, p.reduceMotion, deliberate);
+  b.wallBlend += ((b.wall !== 0 ? 1 : 0) - b.wallBlend) * Math.min(1, dt * 5);
   // Rotating can widen him past a wall: shove him back out.
   const half2 = bodyHalfX(b.rot);
   b.x = clamp(b.x, half2, 1 - half2);

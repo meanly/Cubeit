@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { StickmanPreview } from '../character/StickmanPreview';
+import { DEVICES } from '../content/devices';
 import { ACCESSORIES, DEFAULT_APPEARANCE, paletteById, type Appearance } from '../content/appearance';
 import { itemsForSlot, SLOTS, type ItemId, type SlotId } from '../content/items';
 import { LIGHTS, THEMES, themeById, type ThemeId } from '../content/themes';
@@ -19,11 +20,10 @@ import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 import { fonts, radii } from '../theme/tokens';
 import { confirm } from '../ui/Confirm';
-import { Button, PressableScale, Segmented, StarCount } from '../ui/primitives';
+import { DevicePreview } from '../screens/DeviceFrame';
+import { Button, PressableScale, StarCount } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
 import { useColors, useStyles, type Colors } from '../theme/theme';
-
-type Tab = 'room' | 'furniture' | 'look';
 
 interface Selection {
   kind: ContentKind;
@@ -44,7 +44,6 @@ export function CustomizePanel() {
   const progress = useGame((s) => s.progress);
   const draft = useUi((s) => s.draft);
   const setDraft = useUi((s) => s.setDraft);
-  const [tab, setTab] = useState<Tab>('room');
   const level = bondLevel(progress.bondXp);
 
   useEffect(() => {
@@ -67,6 +66,7 @@ export function CustomizePanel() {
     const light = LIGHTS.find((l) => l.id === room.light)!;
     const color = paletteById(look.bodyColor);
     const acc = ACCESSORIES.find((a) => a.id === look.accessory)!;
+    const device = DEVICES.find((d) => d.id === room.device) ?? DEVICES[0];
     const items = SLOTS.flatMap((slot) => {
       const id = room.items[slot.id];
       const def = id ? itemsForSlot(slot.id).find((i) => i.id === id) : undefined;
@@ -77,6 +77,7 @@ export function CustomizePanel() {
       { kind: 'light', id: light.id, name: light.name, unlock: light.unlock },
       { kind: 'color', id: color.id, name: color.name, unlock: color.unlock },
       { kind: 'accessory', id: acc.id, name: acc.name, unlock: acc.unlock },
+      { kind: 'device', id: device.id, name: device.name, unlock: device.unlock },
       ...items,
     ];
   }, [room, look]);
@@ -114,66 +115,49 @@ export function CustomizePanel() {
   return (
     <View style={styles.flex}>
       <PanelHeader title="Customize" right={<StarCount value={progress.stars} />} />
-      <View style={styles.tabs}>
-        <Segmented
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'room', label: 'Room' },
-            { value: 'furniture', label: 'Furniture' },
-            { value: 'look', label: 'Look' },
-          ]}
-        />
-      </View>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-        {tab === 'room' && (
-          <>
-            <Text style={styles.group}>Theme</Text>
-            <Row>
-              {THEMES.map((t) =>
-                option({ kind: 'theme', id: t.id, name: t.name, unlock: t.unlock }, room.theme === t.id, () => setRoom({ theme: t.id }), (
-                  <ThemeTile theme={t.id} />
-                )),
-              )}
-            </Row>
-          </>
-        )}
-        {tab === 'furniture' &&
-          SLOTS.map((slot) => (
-            <View key={slot.id}>
-              <Text style={styles.group}>{slot.name}</Text>
-              <Row>
-                {slot.allowEmpty && (
-                  <OptionCard
-                    name="None"
-                    selected={room.items[slot.id] === null}
-                    locked={false}
-                    lockLabel=""
-                    onPress={() => setItem(slot.id, null)}
-                    preview={<Ionicons name="remove-circle-outline" size={26} color={colors.textFaint} />}
-                  />
-                )}
-                {itemsForSlot(slot.id).map((item) => {
-                  const art = slot.id === 'toy' ? null : itemPreview(slot.id, item.id);
-                  return option({ kind: 'item', id: item.id, name: item.name, unlock: item.unlock }, room.items[slot.id] === item.id, () => setItem(slot.id, item.id), (
-                    art ? <LcdTile bitmap={art} size={52} /> : <LcdTile bitmap={BALL_TILE} size={52} />
-                  ));
-                })}
-              </Row>
-            </View>
-          ))}
-        {tab === 'look' && (
-          <>
-            <Text style={styles.group}>Accessory</Text>
-            <Row>
-              {ACCESSORIES.map((a) =>
-                option({ kind: 'accessory', id: a.id, name: a.name, unlock: a.unlock }, look.accessory === a.id, () => setLook({ accessory: a.id }), (
-                  <StickmanPreview accessory={a.id} size={52} />
-                )),
-              )}
-            </Row>
-          </>
-        )}
+      {/* One page: scroll down through the sections, and sideways through each one's options. */}
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content} nestedScrollEnabled>
+        <Section title="Device">
+          {DEVICES.map((d) =>
+            option({ kind: 'device', id: d.id, name: d.name, unlock: d.unlock }, room.device === d.id, () => setRoom({ device: d.id }), (
+              <DevicePreview id={d.id} />
+            )),
+          )}
+        </Section>
+        <Section title="Theme">
+          {THEMES.map((t) =>
+            option({ kind: 'theme', id: t.id, name: t.name, unlock: t.unlock }, room.theme === t.id, () => setRoom({ theme: t.id }), (
+              <ThemeTile theme={t.id} />
+            )),
+          )}
+        </Section>
+        {SLOTS.map((slot) => (
+          <Section key={slot.id} title={slot.name}>
+            {slot.allowEmpty && (
+              <OptionCard
+                name="None"
+                selected={room.items[slot.id] === null}
+                locked={false}
+                lockLabel=""
+                onPress={() => setItem(slot.id, null)}
+                preview={<Ionicons name="remove-circle-outline" size={26} color={colors.textFaint} />}
+              />
+            )}
+            {itemsForSlot(slot.id).map((item) => {
+              const art = slot.id === 'toy' ? null : itemPreview(slot.id, item.id);
+              return option({ kind: 'item', id: item.id, name: item.name, unlock: item.unlock }, room.items[slot.id] === item.id, () => setItem(slot.id, item.id), (
+                art ? <LcdTile bitmap={art} size={52} /> : <LcdTile bitmap={BALL_TILE} size={52} />
+              ));
+            })}
+          </Section>
+        ))}
+        <Section title="Accessory">
+          {ACCESSORIES.map((a) =>
+            option({ kind: 'accessory', id: a.id, name: a.name, unlock: a.unlock }, look.accessory === a.id, () => setLook({ accessory: a.id }), (
+              <StickmanPreview accessory={a.id} size={52} />
+            )),
+          )}
+        </Section>
       </ScrollView>
       <View style={styles.footer}>
         {locked.length > 0 ? (
@@ -220,12 +204,18 @@ function UnlockBar({ selection, stars }: { selection: Selection; stars: number }
   );
 }
 
-function Row({ children }: { children: ReactNode }) {
+/** A titled row of options that scrolls sideways. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
   const styles = useStyles(makeStyles);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.row}>
-      {children}
-    </ScrollView>
+    <View style={styles.section}>
+      <Text style={styles.group} accessibilityRole="header">
+        {title}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.row}>
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -271,18 +261,9 @@ function OptionCard({
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
   flex: { flex: 1 },
-  tabs: { paddingHorizontal: 16, paddingBottom: 6 },
-  content: { paddingBottom: 12 },
-  group: {
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    color: colors.textFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginTop: 12,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-  },
+  content: { paddingTop: 4, paddingBottom: 16, gap: 18 },
+  section: { gap: 10 },
+  group: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, paddingHorizontal: 16, letterSpacing: -0.2 },
   noGrow: { flexGrow: 0 },
   row: { paddingHorizontal: 16, gap: 10, alignItems: 'flex-start' },
   option: {

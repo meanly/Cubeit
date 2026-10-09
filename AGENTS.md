@@ -27,6 +27,7 @@ Run lint and typecheck before declaring any task done.
 
 - Single-screen app: the room is always visible; Talk / Play / Customize / Memories / Nearby / Notifications are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used.
 - Per-frame work (physics, sensor, animated styles) stays on the UI thread in worklets; JS moves bodies only through `world.commands`. See `docs/ARCHITECTURE.md`.
+- UI colors come from `useColors()` / `useStyles(makeStyles)` (light and dark palettes in `src/theme/tokens.ts`); never hard-code a palette color in a component.
 - Write shared values with `.set()` (React Compiler lint rules flag `.value =` outside worklets).
 - Saved data shape changes need `SAVE_VERSION` + a migration in `src/state/migrations.ts`.
 - Keep the honesty rules: no feature may claim local AI or real nearby discovery that isn't there (see `docs/LOCAL_AI.md`, `docs/NEARBY.md`).

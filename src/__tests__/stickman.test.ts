@@ -113,6 +113,20 @@ describe('pixel stickman', () => {
     expect(centroid(hit, GRID - 2, GRID - 1)).toBeCloseTo(centroid(rest, GRID - 2, GRID - 1), 0);
   });
 
+  it('shrugs: raising one arm lifts that shoulder and tilts the shoulder bar', () => {
+    const top = Math.min(...cells(rasterStickman(IDLE_INPUT).grid).map(([, y]) => y));
+    const shoulderRow = top + 6; // the 8-dot shoulder bar at rest
+    const lit = (grid: number[], col: number, row: number) => grid[row * GRID + col] !== 0;
+    const rest = rasterStickman(IDLE_INPUT).grid;
+    const raised = draw({ armR: 2.2 }).grid;
+    // At rest the bar spans both shoulders on one row.
+    expect(lit(rest, GRID / 2 - 4, shoulderRow)).toBe(true);
+    expect(lit(rest, GRID / 2 + 2, shoulderRow)).toBe(true);
+    // Raising the right arm lifts the right end of the bar off that row; the left end stays.
+    expect(lit(raised, GRID / 2 - 4, shoulderRow)).toBe(true);
+    expect(lit(raised, GRID / 2 + 2, shoulderRow)).toBe(false);
+  });
+
   it('flails after a hard knock: arms thrown up above the shoulders', () => {
     const top = Math.min(...cells(draw({}).grid).map(([, y]) => y));
     // Lit dots above the shoulder bar but outside the collar are hands.
@@ -132,6 +146,15 @@ describe('pixel stickman', () => {
     expect(sleep.w).toBeGreaterThan(sleep.h);
     const fallen = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI / 2 }).grid);
     expect(fallen.w).toBeGreaterThan(fallen.h * 2);
+  });
+
+  it('stands on a wall as the whole upright figure turned a quarter (not squashed like lying)', () => {
+    const lying = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI / 2, motion: 0.35 }).grid);
+    const onWall = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI * 1.5, wall: 1, motion: 0.35 }).grid);
+    expect(onWall.w).toBeGreaterThanOrEqual(20);
+    // Exactly as thick as the standing figure is wide, and thicker than the edge-on lying one.
+    expect(onWall.h).toBe(bounds(rasterStickman(IDLE_INPUT).grid).w);
+    expect(onWall.h).toBeGreaterThan(lying.h);
   });
 
   it('topples through every angle, and lies head-down in a corner past flat', () => {

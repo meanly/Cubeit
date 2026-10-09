@@ -156,6 +156,8 @@ export interface StickmanInput {
    * + tips the head toward +x. π/2 is lying flat; past it, head-down into a corner.
    */
   rot: number;
+  /** 0..1: standing on a side wall (BodyState.wallBlend) — a normal standing pose, just turned. */
+  wall: number;
   // room edges, in dots from the body's center line / up from its feet
   roomL: number;
   roomR: number;
@@ -207,6 +209,7 @@ export const IDLE_INPUT: StickmanInput = {
   fallen: 0,
   fallDir: 1,
   rot: 0,
+  wall: 0,
   roomL: 99,
   roomR: 99,
   roomT: 99,
@@ -440,7 +443,10 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
 
   bendR += p.wave * Math.sin(tq * 11) * 0.4;
 
-  if (p.fallen === 1) {
+  // Standing on a wall counts as standing: the usual poses, just rotated.
+  const onWall = p.wall >= 0.5;
+  const tumbling = p.fallen === 1 && !onWall;
+  if (tumbling) {
     // Knocked over by the tilt: arms thrown up and flapping, legs kicking.
     armL = 1.5 + Math.sin(tq * 14) * 0.4 * m;
     armR = 1.5 - Math.sin(tq * 14) * 0.4 * m;
@@ -477,7 +483,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   }
 
   const beat = Math.floor(t * 2.5);
-  if (p.fallen !== 1) {
+  if (!tumbling) {
     switch (st) {
       case S_LOOK:
         headDX = Math.round(Math.sin(tq * 1.7) * 1.3);
@@ -596,7 +602,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
 
   // Idle fidgets: every few seconds, a short, randomly chosen bit of business.
   const settled = Math.abs(p.armL) + Math.abs(p.armR) + p.bounce + p.lower < 0.1;
-  if (st === S_IDLE && grounded && !walking && lively && settled && p.fallen !== 1) {
+  if (st === S_IDLE && grounded && !walking && lively && settled && !tumbling) {
     const period = 5.5 + rand(p.seed + 3) * 2;
     const at = t + p.seed * 1.7;
     const k = Math.floor(at / period);
@@ -645,7 +651,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   const rc = Math.max(-1.3, Math.min(1.3, p.recoil)) * m;
   const fl = Math.max(0, Math.min(1, p.flail)) * m;
   const jit = Math.sin(tq * 23 + p.seed * 5);
-  const lie = Math.abs(rot) > Math.PI / 4;
+  const lie = Math.abs(rot) > Math.PI / 4 && !onWall;
   const lieDir = rot >= 0 ? 1 : -1;
   const upright = Math.abs(rot) < 0.05;
   if (lie) {
@@ -739,6 +745,32 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     else solve(pt, SH_R, ELB_R, HAND_R, pt[CHEST] + reachRX, chestU + reachRU, UPPER_ARM, FOREARM, 1);
   }
 
+  // Shoulders aren't bolted on: an arm raised toward (or over) its shoulder
+  // lifts that shoulder in a shrug of up to 1.5 dots, pulled in a little; the
+  // shoulder bar runs between the two shoulders, so it tilts with them, and the
+  // collar follows halfway. Hanging arms (the rest pose) leave them level.
+  for (let side = -1; side <= 1; side += 2) {
+    const sh = side < 0 ? SH_L : SH_R;
+    const el = side < 0 ? ELB_L : ELB_R;
+    const hd = side < 0 ? HAND_L : HAND_R;
+    const shrug = Math.max(0, Math.min(1.5, (pt[hd + 1] - pt[sh + 1] + 1) * 0.4)) * (lively || p.fallen === 1 ? 1 : 0.6);
+    if (shrug > 0) {
+      const dx = -side * shrug * 0.3;
+      pt[sh] += dx;
+      pt[sh + 1] += shrug;
+      pt[el] += dx;
+      pt[el + 1] += shrug;
+      pt[hd] += dx;
+      pt[hd + 1] += shrug;
+    }
+  }
+  pt[BAR_L] = pt[SH_L];
+  pt[BAR_L + 1] = pt[SH_L + 1];
+  pt[BAR_R] = pt[SH_R];
+  pt[BAR_R + 1] = pt[SH_R + 1];
+  pt[COL_L + 1] = chestU + 1 + (pt[SH_L + 1] - chestU) * 0.5;
+  pt[COL_R + 1] = chestU + 1 + (pt[SH_R + 1] - chestU) * 0.5;
+
   // Arms never poke through the walls or the ceiling: against a wall the arm
   // straightens along it (down, or up if it was raised); under the ceiling the
   // hand presses flat against it.
@@ -784,7 +816,8 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     // it tips, then drop it so its lowest point rests on the floor.
     const sn = Math.sin(rot);
     const cs = Math.cos(rot);
-    const squish = mx * (1 - SIDE_SQUISH * Math.min(1, Math.abs(sn)));
+    // Lying, he's seen edge-on; standing on a wall he faces us as usual.
+    const squish = mx * (1 - SIDE_SQUISH * Math.min(1, Math.abs(sn)) * (1 - Math.min(1, p.wall)));
     const pivot = HEAD_TOP_U / 2;
     let minU = Infinity;
     for (let i = 0; i < POINTS; i += 2) {
@@ -838,7 +871,9 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   // (cells -2..1 around its center), turned in quarter steps as it tips.
   const hc = Math.round(C + pt[HEAD]);
   const hr = Math.round(GRID - pt[HEAD + 1]);
-  const q = Math.round(rot / (Math.PI / 2));
+  // Quarter turns, folded into -1..2 (3π/2 on a wall is the same as -π/2).
+  const q4 = (((Math.round(rot / (Math.PI / 2)) % 4) + 4) % 4) as number;
+  const q = q4 === 3 ? -1 : q4;
   const at = (lc: number, lr: number, v: number) => {
     'worklet';
     if (q === 0) plot(grid, hc + lc, hr + lr, v);

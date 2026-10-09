@@ -137,6 +137,32 @@ describe('character physics', () => {
     expect(Math.abs(b.rot)).toBeLessThan(0.01);
   });
 
+  it('stands up on the wall a held hard tilt makes the floor, then steps back down when it eases', () => {
+    const b = initialBody(0.5, 0.3);
+    const t = { ...initialTilt(), x: -1 };
+    const events: number[] = [];
+    for (let i = 0; i < 360; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
+    // Feet against the left wall, head toward the room: rotated three quarters (≡ a quarter the other way).
+    expect(b.wall).toBe(-1);
+    expect(b.rot).toBeCloseTo(-Math.PI * 1.5, 1);
+    expect(b.wallBlend).toBeGreaterThan(0.95);
+    expect(b.x).toBeCloseTo(WORLD.lieHalf, 3);
+    // Easing the tilt brings the floor back: he pivots upright, already on his feet.
+    t.x = 0.1;
+    for (let i = 360; i < 480; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
+    expect(b.wall).toBe(0);
+    expect(b.fallen).toBe(0);
+    expect(Math.abs(b.rot)).toBeLessThan(0.02);
+  });
+
+  it('still stands up on the wall at a low frame rate (long steps settle instead of micro-bouncing)', () => {
+    const b = initialBody(0.5, 0.3);
+    const t = { ...initialTilt(), x: -0.86 };
+    for (let i = 0; i < 100; i++) stepBody(b, t, params(), g, 0.05, 10 + i * 0.05, []);
+    expect(b.wall).toBe(-1);
+    expect(b.rot).toBeCloseTo(-Math.PI * 1.5, 1);
+  });
+
   it('lies flat (not in the corner) when knocked over by a milder tilt', () => {
     const b = initialBody(0.5, 0.3);
     const t = { ...initialTilt(), x: -0.55 };

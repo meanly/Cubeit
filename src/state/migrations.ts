@@ -1,4 +1,5 @@
 import { ACCESSORIES, BODY_COLORS, DEFAULT_APPEARANCE } from '../content/appearance';
+import { DEVICE_IDS } from '../content/devices';
 import { FINDS, type FindId } from '../content/finds';
 import { DEFAULT_ITEMS, ITEMS, SLOTS, type ItemId, type RoomItems } from '../content/items';
 import { LIGHTS, THEMES } from '../content/themes';
@@ -38,6 +39,11 @@ const MIGRATIONS: Record<number, (doc: Obj) => Obj> = {
   3: (doc) => {
     const settings = obj(doc.settings);
     return { ...doc, settings: { ...settings, appearance: 'system' } };
+  },
+  // v5: a choice of device color; 'auto' keeps the look it had (light / dark).
+  4: (doc) => {
+    const room = obj(doc.room);
+    return { ...doc, room: { ...room, device: 'auto' } };
   },
 };
 
@@ -146,6 +152,7 @@ export function sanitizeSave(doc: Obj, now: number = Date.now()): SaveData {
       light: oneOf(room.light, LIGHTS.map((l) => l.id), d.room.light),
       items: sanitizeItems(room.items),
       lampOn: bool(room.lampOn, d.room.lampOn),
+      device: oneOf(room.device, DEVICE_IDS, d.room.device),
     },
     progress: {
       stars: int(progress.stars, d.progress.stars, 0, 1_000_000),

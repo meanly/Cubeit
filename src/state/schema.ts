@@ -1,4 +1,5 @@
 import { DEFAULT_APPEARANCE, type Appearance } from '../content/appearance';
+import type { DeviceId } from '../content/devices';
 import type { FindId } from '../content/finds';
 import { DEFAULT_ITEMS, type RoomItems } from '../content/items';
 import type { LightId, ThemeId } from '../content/themes';
@@ -8,7 +9,7 @@ import type { LightId, ThemeId } from '../content/themes';
  * document (`SaveData`), plus a separate memories document. Bump
  * SAVE_VERSION and add a step to `migrations.ts` whenever the shape changes.
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const SAVE_KEY = 'cubeit.save';
 
 export interface Personality {
@@ -42,6 +43,8 @@ export interface RoomConfig {
   light: LightId;
   items: RoomItems;
   lampOn: boolean;
+  /** The device's color around the LCD ('auto' follows light / dark). */
+  device: DeviceId;
 }
 
 export type GameId = 'starCatch' | 'peekaboo';
@@ -135,7 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function defaultRoom(): RoomConfig {
-  return { theme: 'midnight', light: 'moonlight', items: { ...DEFAULT_ITEMS }, lampOn: true };
+  return { theme: 'midnight', light: 'moonlight', items: { ...DEFAULT_ITEMS }, lampOn: true, device: 'auto' };
 }
 
 export function createDefaultSave(now: number = Date.now(), rng: () => number = Math.random): SaveData {

@@ -41,6 +41,15 @@ export interface BodyState {
    */
   rot: number;
   rotV: number;
+  /**
+   * Standing on a side wall (-1 left, 1 right, 0 no): a held hard tilt makes
+   * that wall the floor, so once he's settled in the corner he rolls over onto
+   * his feet against it (rot ±3π/2). `wallBlend` eases 0..1 for the drawing,
+   * `wallT` times how long he's been settled in the corner.
+   */
+  wall: number;
+  wallBlend: number;
+  wallT: number;
   /** The screen is tipped over so far that gravity pulls toward its top edge. */
   gUp: number;
   /** Lying pressed against the ceiling. */
@@ -148,6 +157,9 @@ export function initialBody(x: number, z: number): BodyState {
     fallDir: 1,
     rot: 0,
     rotV: 0,
+    wall: 0,
+    wallBlend: 0,
+    wallT: 0,
     gUp: 0,
     onCeil: 0,
     hasTarget: 0,

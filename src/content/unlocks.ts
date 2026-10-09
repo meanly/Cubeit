@@ -7,7 +7,7 @@ export type Unlock =
 export const DEFAULT_UNLOCK: Unlock = { kind: 'default' };
 
 /** Content ids can repeat across categories (a "peach" theme and a "peach" color), so purchases are namespaced. */
-export type ContentKind = 'theme' | 'light' | 'item' | 'color' | 'accessory';
+export type ContentKind = 'theme' | 'light' | 'item' | 'color' | 'accessory' | 'device';
 export const unlockKey = (kind: ContentKind, id: string) => `${kind}:${id}`;
 
 export function unlockLabel(unlock: Unlock): string {
