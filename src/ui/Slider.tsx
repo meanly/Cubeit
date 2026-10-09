@@ -72,7 +72,7 @@ export function Slider({ value, min, max, step = 0.1, onChange, label }: Props) 
 
 const styles = StyleSheet.create({
   wrap: { height: 40, justifyContent: 'center' },
-  track: { position: 'absolute', left: THUMB / 2, right: THUMB / 2, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.3)' },
+  track: { position: 'absolute', left: THUMB / 2, right: THUMB / 2, height: 6, borderRadius: 3, backgroundColor: colors.surfacePressed },
   fill: { position: 'absolute', left: THUMB / 2, height: 6, borderRadius: 3, backgroundColor: colors.accent },
   thumb: {
     position: 'absolute',

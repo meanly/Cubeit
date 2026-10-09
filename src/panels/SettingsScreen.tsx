@@ -19,7 +19,7 @@ import { colors, fonts, radii } from '../theme/tokens';
 import { confirm, ConfirmHost } from '../ui/Confirm';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Slider } from '../ui/Slider';
-import { Ambient } from '../ui/Ambient';
+import { Backdrop } from '../ui/Backdrop';
 import { Toasts } from '../ui/Toasts';
 
 export function SettingsScreen() {
@@ -54,12 +54,12 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
 
   return (
     <View style={[styles.flex, styles.screen, { paddingTop: insets.top }]}>
-      <Ambient />
+      <Backdrop />
       <View style={styles.header}>
         <Text style={styles.title} accessibilityRole="header">
           Settings
         </Text>
-        <IconButton icon="close" label="Close settings" onPress={onClose} color={colors.text} />
+        <IconButton icon="close" label="Close settings" onPress={onClose} />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
         <Section title="Motion">
@@ -306,20 +306,12 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   screen: { backgroundColor: colors.bg },
-  header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 20, paddingRight: 8 },
-  title: { fontFamily: fonts.black, fontSize: 24, color: colors.text },
+  header: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 20, paddingRight: 16 },
+  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.text, letterSpacing: -0.5 },
   content: { paddingHorizontal: 16, gap: 18 },
   section: { gap: 8 },
-  sectionTitle: { fontFamily: fonts.medium, fontSize: 12, color: colors.textFaint, textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderTopColor: colors.lineStrong,
-  },
+  sectionTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, marginLeft: 2 },
+  card: { backgroundColor: colors.paper, borderRadius: radii.lg, padding: 16, gap: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   rowLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.textDim },
@@ -331,9 +323,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderWidth: 1,
-    borderColor: colors.line,
+    backgroundColor: colors.paper,
     paddingHorizontal: 14,
     color: colors.text,
     fontFamily: fonts.bold,

@@ -18,23 +18,22 @@ import { TiltSensorHost } from '../sensors/TiltSensorHost';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 import { colors } from '../theme/tokens';
-import { Ambient } from '../ui/Ambient';
-import { GlassBackdrop, GlassRoot } from '../ui/Glass';
+import { Backdrop } from '../ui/Backdrop';
 import { Toasts } from '../ui/Toasts';
 import { ActionBar, ACTION_BAR_HEIGHT } from './ActionBar';
 import { Header, HEADER_HEIGHT } from './Header';
+import { BEZEL, CHIN, DeviceFrame, deviceSize, HOUSING } from './DeviceFrame';
+import { HomeCards, HOME_CARDS_HEIGHT } from './HomeCards';
 import { Onboarding } from './Onboarding';
 
 const SIDE = 16;
-/** Width of the frame around the LCD, as a share of the space available. */
-const FRAME_RATIO = 0.065;
+/** The screen takes a little less than all the room it has, so it breathes. */
+const SCREEN_SCALE = 0.86;
 
 export function HomeScreen() {
   return (
     <WorldProvider>
-      <GlassRoot>
-        <HomeContent />
-      </GlassRoot>
+      <HomeContent />
     </WorldProvider>
   );
 }
@@ -49,28 +48,32 @@ function HomeContent() {
   useDailyLife(onboarded);
 
   const stageTop = insets.top + HEADER_HEIGHT;
-  const stageBottom = root.h - insets.bottom - ACTION_BAR_HEIGHT;
+  const stageBottom = root.h - insets.bottom - ACTION_BAR_HEIGHT - HOME_CARDS_HEIGHT;
   const stageH = Math.max(0, stageBottom - stageTop);
-  // A square frame, with the square LCD inside it. Each dot is a whole number
-  // of device pixels so the dots stay crisp.
+  // A full-width ink card with the square LCD centered in it. Each dot is a
+  // whole number of device pixels so the dots stay crisp.
   const px = PixelRatio.get();
-  const fit = Math.max(0, Math.min(root.w - SIDE * 2, 560, stageH - 12));
-  const border = Math.round(fit * FRAME_RATIO);
-  const roomW = (Math.floor(((fit - border * 2) * px) / LCD_DOTS) * LCD_DOTS) / px;
+  // The LCD (each dot a whole number of device pixels, so the dots stay
+  // crisp) mounted in its device, centered in the space between the greeting
+  // and the cards.
+  const chromeW = (HOUSING + BEZEL) * 2;
+  const chromeH = BEZEL * 2 + HOUSING + CHIN;
+  const space = Math.max(0, Math.min(root.w - SIDE * 2 - chromeW, 560, stageH - 24 - chromeH));
+  const fit = space * SCREEN_SCALE;
+  const roomW = (Math.floor((fit * px) / LCD_DOTS) * LCD_DOTS) / px;
   const roomH = roomW;
-  const frameW = roomW + border * 2;
-  const frameH = frameW;
+  const { width: frameW, height: frameH } = deviceSize(roomW);
   // Must match the resting position computed in roomStyle below (translateY 0 when no panel is open).
-  const roomTop = stageTop + 4 + (stageH - 12 - frameH) / 2;
+  const roomTop = stageTop + (stageH - frameH) / 2;
 
-  // The open panel's top edge; the room scales down to fit above it.
+  // The open panel's top edge; the device scales down to fit above it.
   const panelTop = useSharedValue(10_000);
   const roomStyle = useAnimatedStyle(() => {
-    const bottom = Math.min(stageBottom, panelTop.value) - 8;
+    const bottom = Math.min(stageBottom, panelTop.value) - 10;
     const available = bottom - stageTop - 4;
     const scale = Math.max(0.3, Math.min(1, available / frameH));
     const top = stageTop + 4 + (available - frameH * scale) / 2;
-    return { transform: [{ translateY: top - roomTop }, { scale }] };
+    return { transform: [{ translateY: Math.min(0, top - roomTop) }, { scale }] };
   });
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -84,38 +87,40 @@ function HomeContent() {
   return (
     <View style={styles.root} onLayout={onLayout}>
       <TiltSensorHost />
-      {/* Everything glass surfaces frost: the ambient light and the room. */}
-      <GlassBackdrop style={StyleSheet.absoluteFill}>
-        <Ambient />
-        {ready && (
-          <Animated.View
-            style={[styles.roomWrap, { top: roomTop, left: (root.w - frameW) / 2, width: frameW, height: frameH }, roomStyle]}
-          >
-            <View style={[styles.frame, { padding: border - 1, borderRadius: border * 1.5 }]}>
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.frameRim, { borderRadius: border * 1.5 }]} />
-              <Room width={roomW} height={roomH} overlay={<GameHud />}>
-                {visitor && <VisitorLayer roomWidth={roomW} roomHeight={roomH} />}
-                <GameHost roomWidth={roomW} roomHeight={roomH} />
-              </Room>
-            </View>
-          </Animated.View>
-        )}
-      </GlassBackdrop>
+      <Backdrop />
       <View style={[styles.header, { top: insets.top }]} pointerEvents="box-none">
         <Header />
       </View>
-      <View style={[styles.actions, { bottom: insets.bottom }]}>
-        <ActionBar disabled={busy} />
-      </View>
+      {ready && (
+        <Animated.View
+          style={[styles.roomWrap, { top: roomTop, left: (root.w - frameW) / 2, width: frameW, height: frameH }, roomStyle]}
+        >
+          <DeviceFrame>
+            <Room width={roomW} height={roomH} overlay={<GameHud />}>
+              {visitor && <VisitorLayer roomWidth={roomW} roomHeight={roomH} />}
+              <GameHost roomWidth={roomW} roomHeight={roomH} />
+            </Room>
+          </DeviceFrame>
+        </Animated.View>
+      )}
+      {ready && (
+        <View style={[styles.cards, { top: stageBottom }]} pointerEvents="box-none">
+          <HomeCards disabled={busy} />
+        </View>
+      )}
       {ready && (
         <PanelHost
           panels={PANELS}
           rootHeight={root.h}
           topReserve={stageTop + 150}
-          bottomInset={insets.bottom}
+          bottomInset={insets.bottom + ACTION_BAR_HEIGHT}
           panelTop={panelTop}
         />
       )}
+      {/* The nav floats above everything, open sheets included. */}
+      <View style={[styles.actions, { bottom: insets.bottom }]} pointerEvents="box-none">
+        <ActionBar disabled={busy} />
+      </View>
       <Toasts top={insets.top + HEADER_HEIGHT + 6} />
       <SettingsScreen />
       {!onboarded && <Onboarding />}
@@ -128,21 +133,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg, overflow: Platform.OS === 'web' ? ('clip' as ViewStyle['overflow']) : 'hidden' },
   roomWrap: { position: 'absolute', transformOrigin: '50% 0%' },
   header: { position: 'absolute', left: 0, right: 0 },
-  // A clear glass slab around the LCD: frosted edge, bright rim on top.
-  frame: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    shadowColor: '#000',
-    shadowOpacity: 0.55,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 12,
-  },
-  frameRim: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderTopColor: colors.specular,
-    borderLeftColor: 'rgba(255,255,255,0.16)',
-  },
+  cards: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   actions: { position: 'absolute', left: 0, right: 0 },
 });

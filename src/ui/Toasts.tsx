@@ -5,7 +5,6 @@ import Animated, { FadeInUp, FadeOutUp, LinearTransition } from 'react-native-re
 
 import { useUi, type Toast } from '../state/uiStore';
 import { colors, fonts, radii } from '../theme/tokens';
-import { Glass } from './Glass';
 import { PressableScale } from './primitives';
 
 /** Small, non-blocking notices (rewards, milestones, problems). */
@@ -36,10 +35,10 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast.id]);
   const icon = toast.tone === 'reward' ? 'sparkles' : toast.tone === 'warning' ? 'alert-circle' : 'information-circle';
-  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.warning : colors.accent;
+  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.yellow : colors.onInk;
   return (
     <Animated.View entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(180)} layout={LinearTransition} style={styles.shadow}>
-      <Glass radius={22} native={false} style={styles.toast}>
+      <View style={styles.toast}>
       <Ionicons name={icon} size={18} color={tint} />
       <Text style={styles.text} accessibilityLiveRegion="polite">
         {toast.text}
@@ -56,7 +55,7 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
           <Text style={styles.actionText}>{toast.action.label}</Text>
         </PressableScale>
       )}
-      </Glass>
+      </View>
     </Animated.View>
   );
 }
@@ -67,9 +66,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingLeft: 14,
+    paddingLeft: 16,
     paddingRight: 8,
-    minHeight: 44,
+    minHeight: 46,
+    borderRadius: radii.md,
+    backgroundColor: colors.ink,
   },
   shadow: {
     maxWidth: 460,
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 10,
   },
-  text: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text, paddingVertical: 10 },
-  action: { paddingHorizontal: 14, height: 32, borderRadius: 16, backgroundColor: colors.accent, justifyContent: 'center' },
-  actionText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
+  text: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.onInk, paddingVertical: 10 },
+  action: { paddingHorizontal: 14, height: 32, borderRadius: radii.sm, backgroundColor: colors.yellow, justifyContent: 'center' },
+  actionText: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
 });

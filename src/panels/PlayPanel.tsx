@@ -8,7 +8,7 @@ import type { GameId } from '../state/schema';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 import { colors, fonts, radii } from '../theme/tokens';
-import { PressableScale, type IconName } from '../ui/primitives';
+import { IconBadge, PressableScale, type IconName } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
 
 const GAMES: { id: GameId; title: string; blurb: string; icon: IconName; tint: string }[] = [
@@ -17,7 +17,7 @@ const GAMES: { id: GameId; title: string; blurb: string; icon: IconName; tint: s
     title: 'Star Catch',
     blurb: 'Tilt your phone (or drag on the floor) to help catch falling stars.',
     icon: 'star',
-    tint: colors.star,
+    tint: colors.yellow,
   },
   {
     id: 'peekaboo',
@@ -45,9 +45,7 @@ export function PlayPanel() {
             onPress={() => start(g.id)}
             style={styles.card}
           >
-            <View style={[styles.icon, { backgroundColor: `${g.tint}22` }]}>
-              <Ionicons name={g.icon} size={24} color={g.tint} />
-            </View>
+            <IconBadge icon={g.icon} color={g.tint} size={44} />
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{g.title}</Text>
               <Text style={styles.cardText}>{g.blurb}</Text>
@@ -67,7 +65,7 @@ export function PlayPanel() {
             }}
             style={[styles.mini, !hasBall && { opacity: 0.45 }]}
           >
-            <Ionicons name="basketball-outline" size={20} color={colors.danger} />
+            <IconBadge icon="basketball" color={colors.red} size={36} />
             <Text style={styles.miniTitle}>Play ball</Text>
             <Text style={styles.miniText}>{hasBall ? `${name} chases the ball` : 'Add the ball in Customize'}</Text>
           </PressableScale>
@@ -77,7 +75,7 @@ export function PlayPanel() {
             onPress={() => useUi.getState().openPanel('nearby')}
             style={styles.mini}
           >
-            <Ionicons name="people-outline" size={20} color={colors.success} />
+            <IconBadge icon="people" color={colors.teal} size={36} />
             <Text style={styles.miniTitle}>Nearby friends</Text>
             <Text style={styles.miniText}>Preview · simulation</Text>
           </PressableScale>
@@ -97,14 +95,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: radii.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
-  icon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, gap: 3 },
-  cardTitle: { fontFamily: fonts.black, fontSize: 17, color: colors.text },
+  cardTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
   cardText: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.textDim },
-  best: { fontFamily: fonts.bold, fontSize: 12, color: colors.star, marginTop: 2 },
+  best: { fontFamily: fonts.bold, fontSize: 12, color: colors.red, marginTop: 2 },
   row: { flexDirection: 'row', gap: 10 },
   mini: {
     flex: 1,
@@ -112,8 +107,6 @@ const styles = StyleSheet.create({
     gap: 4,
     borderRadius: radii.lg,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
   miniTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.text, marginTop: 4 },
   miniText: { fontFamily: fonts.regular, fontSize: 12, color: colors.textDim },

@@ -1,70 +1,84 @@
-import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { useUi, type PanelId } from '../state/uiStore';
+import { useUi } from '../state/uiStore';
 import { colors, fonts } from '../theme/tokens';
-import { Glass } from '../ui/Glass';
-import { PressableScale, type IconName } from '../ui/primitives';
+import { NavIcon, type NavIconName } from '../ui/NavIcons';
+import { PressableScale } from '../ui/primitives';
 
 export const ACTION_BAR_HEIGHT = 84;
 
-const ACTIONS: { panel: PanelId; label: string; icon: IconName; iconActive: IconName }[] = [
-  { panel: 'talk', label: 'Talk', icon: 'chatbubble-ellipses-outline', iconActive: 'chatbubble-ellipses' },
-  { panel: 'play', label: 'Play', icon: 'game-controller-outline', iconActive: 'game-controller' },
-  { panel: 'customize', label: 'Customize', icon: 'color-palette-outline', iconActive: 'color-palette' },
-  { panel: 'memories', label: 'Memories', icon: 'book-outline', iconActive: 'book' },
+const TABS: { id: NavIconName; label: string }[] = [
+  { id: 'home', label: 'Home' },
+  { id: 'talk', label: 'Talk' },
+  { id: 'memories', label: 'Memories' },
+  { id: 'settings', label: 'Settings' },
 ];
 
-/** Floating glass tab bar under the room; the open panel's tab sits in a brighter lens. */
+const ITEM = 48;
+
+/**
+ * Compact floating ink pill, centered on the screen. Every tab is the same
+ * size; the selected one widens to show its label on a soft highlight.
+ */
 export function ActionBar({ disabled }: { disabled?: boolean }) {
   const panel = useUi((s) => s.panel);
-  const openPanel = useUi((s) => s.openPanel);
+  const settingsOpen = useUi((s) => s.settingsOpen);
+  const active: NavIconName = settingsOpen ? 'settings' : panel === 'talk' ? 'talk' : panel === 'memories' ? 'memories' : 'home';
+
+  const go = (tab: NavIconName) => {
+    const ui = useUi.getState();
+    if (tab === 'settings') ui.setSettingsOpen(true);
+    else if (tab === 'home') ui.openPanel('none');
+    else ui.openPanel(active === tab ? 'none' : tab);
+  };
+
   return (
     <View style={styles.wrap} pointerEvents={disabled ? 'none' : 'box-none'}>
-      <Glass radius={32} style={[styles.bar, disabled && styles.disabled]}>
-        {ACTIONS.map((a) => {
-          const active = panel === a.panel;
+      <Animated.View layout={LinearTransition.duration(220)} style={[styles.bar, disabled && styles.disabled]}>
+        {TABS.map((t) => {
+          const on = active === t.id;
           return (
-            <PressableScale
-              key={a.panel}
-              accessibilityRole="button"
-              accessibilityLabel={a.label}
-              accessibilityState={{ selected: active }}
-              onPress={() => openPanel(active ? 'none' : a.panel)}
-              style={[styles.action, active && styles.actionActive]}
-            >
-              <Ionicons name={active ? a.iconActive : a.icon} size={21} color={active ? colors.accent : colors.textDim} />
-              <Text style={[styles.label, active && styles.labelActive]}>{a.label}</Text>
-            </PressableScale>
+            <Animated.View key={t.id} layout={LinearTransition.duration(220)}>
+              <PressableScale
+                accessibilityRole="tab"
+                accessibilityLabel={t.label}
+                accessibilityState={{ selected: on }}
+                onPress={() => go(t.id)}
+                style={[styles.tab, on && styles.tabActive]}
+              >
+                <NavIcon name={t.id} size={22} color={on ? colors.onInk : 'rgba(255,255,255,0.62)'} />
+                {on && (
+                  <Animated.Text entering={FadeIn.duration(200)} style={styles.label} numberOfLines={1}>
+                    {t.label}
+                  </Animated.Text>
+                )}
+              </PressableScale>
+            </Animated.View>
           );
         })}
-      </Glass>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { height: ACTION_BAR_HEIGHT, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center' },
+  wrap: { height: ACTION_BAR_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64,
-    padding: 5,
-    width: '100%',
-    maxWidth: 460,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
+    gap: 6,
+    padding: 6,
+    borderRadius: 24,
+    backgroundColor: colors.ink,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
-  disabled: { opacity: 0.45 },
-  action: { flex: 1, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  actionActive: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderTopColor: 'rgba(255,255,255,0.22)',
-  },
-  label: { fontFamily: fonts.medium, fontSize: 11, color: colors.textDim },
-  labelActive: { color: colors.text },
+  disabled: { opacity: 0.5 },
+  tab: { height: ITEM, minWidth: ITEM, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  tabActive: { paddingLeft: 14, paddingRight: 18, gap: 8, backgroundColor: 'rgba(255,255,255,0.12)' },
+  label: { fontFamily: fonts.bold, fontSize: 14, color: colors.onInk, letterSpacing: -0.1 },
 });

@@ -42,7 +42,7 @@ export function GameHud() {
           </View>
           {s.timeLeft !== null && (
             <View style={styles.pill}>
-              <Ionicons name="time-outline" size={14} color={colors.textDim} />
+              <Ionicons name="time-outline" size={14} color={colors.onInk} />
               <Text style={styles.pillText}>{Math.ceil(s.timeLeft)}s</Text>
             </View>
           )}
@@ -51,7 +51,7 @@ export function GameHud() {
               <Text style={styles.pillText}>{s.round}</Text>
             </View>
           )}
-          <IconButton icon="pause" label="Pause game" onPress={() => s.actions?.pause()} color={colors.text} style={styles.pause} />
+          <IconButton icon="pause" label="Pause game" onPress={() => s.actions?.pause()} color={colors.onInk} style={styles.pause} />
         </View>
       )}
 
@@ -126,35 +126,29 @@ const styles = StyleSheet.create({
     gap: 5,
     height: 30,
     paddingHorizontal: 11,
-    borderRadius: 15,
-    backgroundColor: 'rgba(8,10,9,0.72)',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: colors.line,
-    borderTopColor: colors.lineStrong,
+    borderRadius: radii.sm,
+    backgroundColor: colors.ink,
   },
-  pillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.text },
-  pause: { marginLeft: 'auto', backgroundColor: 'rgba(8,10,9,0.72)', width: 36, height: 36 },
+  pillText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onInk },
+  pause: { marginLeft: 'auto', backgroundColor: colors.ink, width: 36, height: 36, borderRadius: radii.sm },
   message: {
     position: 'absolute',
     top: 60,
     alignSelf: 'center',
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: 'rgba(8,10,9,0.78)',
+    borderRadius: radii.sm,
+    backgroundColor: colors.ink,
   },
-  messageText: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
+  messageText: { fontFamily: fonts.bold, fontSize: 15, color: colors.onInk },
   cardWrap: { ...StyleSheet.absoluteFill, justifyContent: 'center', padding: 22 },
   card: {
-    backgroundColor: 'rgba(14,17,16,0.94)',
+    backgroundColor: colors.paper,
     borderRadius: radii.xl,
     padding: 18,
     gap: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderTopColor: colors.specular,
   },
-  title: { fontFamily: fonts.black, fontSize: 21, color: colors.text },
+  title: { fontFamily: fonts.bold, fontSize: 21, color: colors.text },
   body: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.textDim },
   actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
   scoreRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },

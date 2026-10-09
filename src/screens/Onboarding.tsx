@@ -1,65 +1,79 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Polygon } from 'react-native-svg';
 
+import { StickmanPreview } from '../character/StickmanPreview';
 import { DEFAULT_NAME } from '../state/schema';
 import { useGame } from '../state/gameStore';
 import { colors, fonts, radii } from '../theme/tokens';
-import { Glass } from '../ui/Glass';
-import { Button } from '../ui/primitives';
-import { Wordmark } from '../ui/Wordmark';
+import { PressableScale } from '../ui/primitives';
 
 /** First launch: name your cubeling and learn the three basics. Shown once. */
 export function Onboarding() {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<'name' | 'tips'>('name');
   const [name, setName] = useState(DEFAULT_NAME);
   const rename = useGame((s) => s.renameCharacter);
   const setSettings = useGame((s) => s.setSettings);
   const finalName = name.trim() || DEFAULT_NAME;
+  const finish = () => {
+    rename(finalName);
+    setSettings({ onboarded: true });
+  };
 
   return (
-    <Animated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(300)} style={styles.scrim}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.center}>
-        <Glass radius={radii.xl + 4} strong native={false} style={styles.card}>
-          <Wordmark size={22} />
-          {step === 'name' ? (
-            <>
-              <Text style={styles.title}>Someone just woke up in your cube.</Text>
-              <Text style={styles.body}>What would you like to call them?</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                maxLength={24}
-                autoFocus={Platform.OS !== 'web'}
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={() => setStep('tips')}
-                style={styles.input}
-                placeholder={DEFAULT_NAME}
-                placeholderTextColor={colors.textFaint}
-                accessibilityLabel="Character name"
-              />
-              <Button label="That's the one" onPress={() => setStep('tips')} />
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Say hi to {finalName}!</Text>
-              <Tip n={1} text={`Tap ${finalName} to say hi. Hold to pet. Drag to pick them up.`} />
-              <Tip n={2} text="Tilt your phone and they'll slide around the room. You can turn this off in Settings." />
-              <Tip n={3} text="Talk, play, decorate and keep memories with the buttons below." />
-              <Text style={styles.privacy}>Everything stays on this device. No account, no internet needed.</Text>
-              <Button
-                label="Let's go"
-                onPress={() => {
-                  rename(finalName);
-                  setSettings({ onboarded: true });
-                }}
-              />
-            </>
-          )}
-        </Glass>
+    <Animated.View
+      entering={FadeIn.duration(400)}
+      exiting={FadeOut.duration(300)}
+      style={[styles.screen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+    >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <View style={styles.art}>
+          <Blocks />
+        </View>
+        {step === 'name' ? (
+          <View style={styles.body}>
+            <Text style={styles.title}>Someone just woke up in your cube.</Text>
+            <Text style={styles.sub}>What would you like to call them?</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              maxLength={24}
+              autoFocus={Platform.OS !== 'web'}
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={() => setStep('tips')}
+              style={styles.input}
+              placeholder={DEFAULT_NAME}
+              placeholderTextColor={colors.textFaint}
+              accessibilityLabel="Character name"
+            />
+            <Next label="That's the one" onPress={() => setStep('tips')} />
+          </View>
+        ) : (
+          <View style={styles.body}>
+            <Text style={styles.title}>Say hi to {finalName}!</Text>
+            <Tip n={1} text={`Tap ${finalName} to say hi. Hold to pet. Drag to pick them up.`} />
+            <Tip n={2} text="Tilt your phone and they'll tumble around the room. You can turn this off in Settings." />
+            <Tip n={3} text="Play, decorate, talk and keep memories from the home screen." />
+            <Text style={styles.privacy}>Everything stays on this device. No account, no internet needed.</Text>
+            <Next label="Let's go" onPress={finish} />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </Animated.View>
+  );
+}
+
+/** The round ink button with a chevron. */
+function Next({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <PressableScale accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.next}>
+      <Ionicons name="chevron-forward" size={24} color={colors.onInk} />
+    </PressableScale>
   );
 }
 
@@ -74,33 +88,62 @@ function Tip({ n, text }: { n: number; text: string }) {
   );
 }
 
+const BLOCK = 46;
+const DEPTH = 12;
+/** A 3×3 wall of extruded blocks; the stickman lives in the middle one. */
+/** Outline of a face plus its extrusion toward the lower left. */
+const EXTRUSION = `${DEPTH},0 ${DEPTH + BLOCK},0 ${DEPTH + BLOCK},${BLOCK} ${BLOCK},${BLOCK + DEPTH} 0,${BLOCK + DEPTH} 0,${DEPTH}`;
+const GRID_COLORS: (string | null)[] = [colors.red, colors.ink, '#FFFFFF', colors.red, null, colors.blue, colors.blue, colors.red, colors.teal];
+
+function Blocks() {
+  return (
+    <View style={styles.blocks} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {GRID_COLORS.map((c, i) => (
+        <View key={i} style={styles.blockCell}>
+          <Svg style={StyleSheet.absoluteFill} width={BLOCK + DEPTH} height={BLOCK + DEPTH}>
+            <Polygon points={EXTRUSION} fill={colors.ink} />
+          </Svg>
+          <View style={[styles.block, c ? { backgroundColor: c } : styles.blockLcd]}>{!c && <StickmanPreview accessory="none" size={BLOCK} />}</View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
-  center: { flex: 1, justifyContent: 'flex-end', padding: 16 },
-  card: {
-    padding: 22,
-    gap: 14,
-    marginBottom: 24,
-    maxWidth: 520,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  title: { fontFamily: fonts.black, fontSize: 22, color: colors.text, lineHeight: 28 },
-  body: { fontFamily: fonts.regular, fontSize: 15, color: colors.textDim },
+  flex: { flex: 1 },
+  screen: { ...StyleSheet.absoluteFill, backgroundColor: colors.yellow, paddingHorizontal: 28 },
+  art: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  body: { gap: 14, alignItems: 'center', maxWidth: 440, width: '100%', alignSelf: 'center' },
+  title: { fontFamily: fonts.black, fontSize: 28, lineHeight: 34, color: colors.ink, textAlign: 'center', letterSpacing: -0.5 },
+  sub: { fontFamily: fonts.medium, fontSize: 15, color: colors.inkSoft, textAlign: 'center' },
   input: {
-    height: 50,
+    alignSelf: 'stretch',
+    height: 54,
     borderRadius: radii.md,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
     fontFamily: fonts.bold,
     fontSize: 18,
-    color: colors.text,
+    color: colors.ink,
+    textAlign: 'center',
   },
-  tip: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  tipNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.accent },
-  tipText: { flex: 1, fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, color: colors.textDim },
-  privacy: { fontFamily: fonts.medium, fontSize: 13, color: colors.textFaint },
+  next: {
+    marginTop: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tip: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', alignSelf: 'stretch' },
+  tipNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.yellow },
+  tipText: { flex: 1, fontFamily: fonts.medium, fontSize: 15, lineHeight: 21, color: colors.ink },
+  privacy: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkSoft, textAlign: 'center' },
+  blocks: { width: (BLOCK + DEPTH) * 3, flexDirection: 'row', flexWrap: 'wrap' },
+  blockCell: { width: BLOCK + DEPTH, height: BLOCK + DEPTH },
+  block: { position: 'absolute', left: DEPTH, top: 0, width: BLOCK, height: BLOCK, overflow: 'hidden' },
+  blockLcd: { backgroundColor: colors.ink },
 });

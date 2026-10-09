@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(255,196,107,0.12)',
+    backgroundColor: colors.yellowSoft,
   },
   badgeText: { fontFamily: fonts.bold, fontSize: 12, color: colors.warning },
   title: { fontFamily: fonts.black, fontSize: 18, color: colors.text },

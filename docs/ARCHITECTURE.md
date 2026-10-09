@@ -42,7 +42,7 @@
 | `nearby/` | Nearby service interface, simulation, visitor choreography |
 | `state/` | Save schema, migrations, validators, stores, persistence wiring |
 | `storage/` | Key-value backends (SQLite native, localStorage web) and document reader/writer |
-| `panels/`, `screens/`, `ui/` | Sheets, home screen, primitives, toasts, confirm dialogs |
+| `panels/`, `screens/`, `ui/` | Sheets, home screen (device frame, home cards, nav), primitives, toasts, confirm dialogs |
 
 ## Persistence
 
@@ -90,10 +90,12 @@
   Knocks read through the whole body: the physics keeps a `recoil` spring
   (driven by every velocity change, kicked by wall hits) and a decaying
   `flail`, which the sprite spreads across hips, chest, head, arms and knees.
-- **UI chrome**: liquid glass. Surfaces use `Glass` (`ui/Glass.tsx`): native
-  Liquid Glass on iOS 26+, `expo-blur` elsewhere (Android blurs the
-  `GlassBackdrop`, so glass must render outside it). Colors live in
-  `theme/tokens.ts`.
+- **UI chrome**: flat. A soft gray-green screen (`Backdrop`), white cards and
+  sheets, warm near-black ink for text, primary actions and the floating
+  nav pill (Home / Talk / Memories / Settings, vector icons in `ui/NavIcons`),
+  and four block colors for icon badges. The LCD sits in a little gadget
+  (`screens/DeviceFrame.tsx`); Play and Customize live on the home screen
+  (`screens/HomeCards.tsx`). Colors live in `theme/tokens.ts`.
 - **New behavior**: add a `Behavior` in `brain/behaviors.ts` and a weight in
   `choose()`. Use `ctx.wait` / `ctx.walkTo` so it stays interruptible.
 - **New game**: a scene component (reads `useWorld()`), registered in
