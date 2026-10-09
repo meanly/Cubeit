@@ -15,8 +15,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import { bootstrapPersistence } from './src/state/persistence';
-import { colors } from './src/theme/tokens';
 import { ErrorBoundary } from './src/ui/ErrorBoundary';
+import { ThemeProvider, useTheme } from './src/theme/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -47,10 +47,20 @@ export default function App() {
   if (!ready) return null;
 
   return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
+  );
+}
+
+/** Root views that follow the light / dark theme (background, status bar). */
+function ThemedApp() {
+  const { scheme, colors } = useTheme();
+  return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <StatusBar style="dark" />
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           <ErrorBoundary>
             <HomeScreen />
           </ErrorBoundary>

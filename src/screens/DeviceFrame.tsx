@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { colors, fonts } from '../theme/tokens';
+import { fonts } from '../theme/tokens';
 import { useSvgId } from '../ui/useSvgId';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 /** Housing around the bezel: sides/top, and the taller chin with the label and light. */
 export const HOUSING = 14;
@@ -23,6 +24,8 @@ export function deviceSize(screen: number) {
  * chin with the name and an orange indicator light. The LCD itself is untouched.
  */
 export function DeviceFrame({ children }: { children: ReactNode }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const body = useSvgId('housing');
   return (
     <View style={styles.shadow}>
@@ -55,11 +58,12 @@ export function DeviceFrame({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   shadow: {
     flex: 1,
     borderRadius: RADIUS,
-    shadowColor: '#3F4236',
+    shadowColor: colors.housingShadow,
     shadowOpacity: 0.28,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 18 },
@@ -70,12 +74,12 @@ const styles = StyleSheet.create({
   rim: {
     borderRadius: RADIUS,
     borderWidth: 1.5,
-    borderTopColor: 'rgba(255,255,255,0.9)',
-    borderLeftColor: 'rgba(255,255,255,0.7)',
+    borderTopColor: colors.housingRim,
+    borderLeftColor: colors.housingRim,
     borderRightColor: 'rgba(0,0,0,0.08)',
     borderBottomColor: 'rgba(0,0,0,0.12)',
   },
-  screw: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#B7BAAE' },
+  screw: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.housingScrew },
   screwTL: { top: 5, left: 12 },
   screwTR: { top: 5, right: 12 },
   screwBL: { bottom: 7, left: 12 },
@@ -105,9 +109,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  brand: { fontFamily: fonts.pixelBold, fontSize: 10, letterSpacing: 1.5, color: '#8E9184' },
+  brand: { fontFamily: fonts.pixelBold, fontSize: 10, letterSpacing: 1.5, color: colors.housingLabel },
   grille: { flexDirection: 'row', gap: 3 },
-  slot: { width: 3, height: 10, borderRadius: 1.5, backgroundColor: '#B3B6AA' },
+  slot: { width: 3, height: 10, borderRadius: 1.5, backgroundColor: colors.housingScrew },
   light: {
     width: 8,
     height: 8,

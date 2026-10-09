@@ -4,11 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp, LinearTransition } from 'react-native-reanimated';
 
 import { useUi, type Toast } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { PressableScale } from './primitives';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 /** Small, non-blocking notices (rewards, milestones, problems). */
 export function Toasts({ top }: { top: number }) {
+  const styles = useStyles(makeStyles);
   const toasts = useUi((s) => s.toasts);
   const storageProblem = useUi((s) => s.storageProblem);
   const setStorageProblem = useUi((s) => s.setStorageProblem);
@@ -28,6 +30,8 @@ export function Toasts({ top }: { top: number }) {
 }
 
 function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   useEffect(() => {
     const id = setTimeout(onDone, toast.durationMs ?? (toast.action ? 7000 : 3200));
     return () => clearTimeout(id);
@@ -35,7 +39,7 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast.id]);
   const icon = toast.tone === 'reward' ? 'sparkles' : toast.tone === 'warning' ? 'alert-circle' : 'information-circle';
-  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.yellow : colors.onInk;
+  const tint = toast.tone === 'reward' ? colors.star : toast.tone === 'warning' ? colors.warning : colors.onInk;
   return (
     <Animated.View entering={FadeInUp.duration(220)} exiting={FadeOutUp.duration(180)} layout={LinearTransition} style={styles.shadow}>
       <View style={styles.toast}>
@@ -60,7 +64,8 @@ function ToastView({ toast, onDone }: { toast: Toast; onDone: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center', gap: 8 },
   toast: {
     flexDirection: 'row',
@@ -82,6 +87,6 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   text: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.onInk, paddingVertical: 10 },
-  action: { paddingHorizontal: 14, height: 32, borderRadius: radii.sm, backgroundColor: colors.yellow, justifyContent: 'center' },
-  actionText: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
+  action: { paddingHorizontal: 14, height: 32, borderRadius: radii.sm, backgroundColor: colors.brand, justifyContent: 'center' },
+  actionText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 });

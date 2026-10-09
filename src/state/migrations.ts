@@ -26,6 +26,19 @@ const MIGRATIONS: Record<number, (doc: Obj) => Obj> = {
     if (items.rug === 'roundRug') return { ...doc, room: { ...room, items: { ...items, rug: null } } };
     return doc;
   },
+  // v3: notifications remember when they were last read. Everything already
+  // logged counts as read, so an old save doesn't open with a stale unread dot.
+  2: (doc) => {
+    const progress = obj(doc.progress);
+    const activities = Array.isArray(progress.activities) ? progress.activities.filter(isObj) : [];
+    const latest = activities.reduce((m, a) => Math.max(m, num(a.at, 0, 0)), 0);
+    return { ...doc, progress: { ...progress, notificationsSeenAt: latest } };
+  },
+  // v4: light / dark appearance, following the phone by default.
+  3: (doc) => {
+    const settings = obj(doc.settings);
+    return { ...doc, settings: { ...settings, appearance: 'system' } };
+  },
 };
 
 export interface MigrationResult {
@@ -149,6 +162,7 @@ export function sanitizeSave(doc: Obj, now: number = Date.now()): SaveData {
       visitDays: int(progress.visitDays, 0, 0),
       milestones: unique(strArray(progress.milestones)),
       activities: sanitizeActivities(progress.activities),
+      notificationsSeenAt: num(progress.notificationsSeenAt, now, 0),
       stats: {
         taps: int(stats.taps, 0, 0),
         pets: int(stats.pets, 0, 0),
@@ -163,6 +177,7 @@ export function sanitizeSave(doc: Obj, now: number = Date.now()): SaveData {
       soundEnabled: bool(settings.soundEnabled, d.settings.soundEnabled),
       hapticsEnabled: bool(settings.hapticsEnabled, d.settings.hapticsEnabled),
       reduceMotion: oneOf(settings.reduceMotion, ['system', 'on', 'off'] as const, d.settings.reduceMotion),
+      appearance: oneOf(settings.appearance, ['system', 'light', 'dark'] as const, d.settings.appearance),
       activityLevel: oneOf(settings.activityLevel, ['calm', 'normal', 'lively'] as const, d.settings.activityLevel),
       nightSleep: bool(settings.nightSleep, d.settings.nightSleep),
       recordMilestones: bool(settings.recordMilestones, d.settings.recordMilestones),

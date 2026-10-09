@@ -2,11 +2,12 @@ import { memo } from 'react';
 import { StyleSheet } from 'react-native';
 import Svg, { RadialGradient, Rect, Stop, Defs } from 'react-native-svg';
 
-import { colors } from '../theme/tokens';
 import { useSvgId } from './useSvgId';
+import { useColors } from '../theme/theme';
 
 /** The screen background: `bg` everywhere, deepening to `bgCenter` in the middle. */
 export const Backdrop = memo(function Backdrop() {
+  const colors = useColors();
   const id = useSvgId('backdrop');
   return (
     <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%">

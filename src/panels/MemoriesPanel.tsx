@@ -12,10 +12,11 @@ import { bondProgress, IDLE_UNLOCKS } from '../progression/progression';
 import { grantXp } from '../progression/rewards';
 import { useGame } from '../state/gameStore';
 import { useMemories } from '../state/memoryStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { confirm } from '../ui/Confirm';
 import { Button, Chip, PressableScale, Segmented, type IconName } from '../ui/primitives';
 import { EmptyState, PanelHeader } from './PanelHost';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 type Tab = 'memories' | 'finds' | 'about';
 type Filter = 'all' | 'mine' | 'favorite' | 'moments';
@@ -33,6 +34,7 @@ const TYPE_ICON: Record<MemoryType, IconName> = {
 const formatDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export function MemoriesPanel() {
+  const styles = useStyles(makeStyles);
   const [tab, setTab] = useState<Tab>('memories');
   const [editing, setEditing] = useState<Memory | 'new' | null>(null);
 
@@ -63,6 +65,8 @@ export function MemoriesPanel() {
 }
 
 function MemoryList({ onEdit }: { onEdit: (m: Memory) => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const items = useMemories((s) => s.items);
   const name = useGame((s) => s.character.name);
   const [filter, setFilter] = useState<Filter>('all');
@@ -121,6 +125,8 @@ function MemoryList({ onEdit }: { onEdit: (m: Memory) => void }) {
 }
 
 function MemoryEditor({ memory, onDone }: { memory: Memory | null; onDone: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const [type, setType] = useState<MemoryType>(memory?.type ?? 'note');
   const [content, setContent] = useState(memory?.content ?? '');
   const [tags, setTags] = useState(memory?.tags.join(', ') ?? '');
@@ -214,6 +220,8 @@ function MemoryEditor({ memory, onDone }: { memory: Memory | null; onDone: () =>
 }
 
 function FindsGrid() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const owned = useGame((s) => s.progress.finds);
   const name = useGame((s) => s.character.name);
   return (
@@ -247,6 +255,8 @@ function FindsGrid() {
 }
 
 function About() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const { character, progress, mood } = useGame();
   const bond = bondProgress(progress.bondXp);
   const [now] = useState(() => Date.now());
@@ -296,17 +306,20 @@ function About() {
 }
 
 function Trait({ label, value }: { label: string; value: number }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.trait}>
       <Text style={styles.traitLabel}>{label}</Text>
       <View style={[styles.bar, styles.flex]}>
-        <View style={[styles.barFill, { width: `${Math.round(value * 100)}%`, backgroundColor: colors.blue }]} />
+        <View style={[styles.barFill, { width: `${Math.round(value * 100)}%`, backgroundColor: colors.brand }]} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   tabs: { paddingHorizontal: 16, paddingBottom: 6 },
   list: { paddingHorizontal: 16, paddingBottom: 20, gap: 8 },
@@ -358,7 +371,7 @@ const styles = StyleSheet.create({
   aboutLabel: { fontFamily: fonts.bold, fontSize: 14, color: colors.text, marginTop: 4 },
   aboutHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textFaint },
   bar: { height: 8, borderRadius: 4, backgroundColor: colors.surfacePressed, overflow: 'hidden' },
-  barFill: { height: 8, borderRadius: 4, backgroundColor: colors.red },
+  barFill: { height: 8, borderRadius: 4, backgroundColor: colors.brand },
   trait: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   traitLabel: { width: 64, fontFamily: fonts.medium, fontSize: 13, color: colors.textDim },
   habit: { flexDirection: 'row', alignItems: 'center', gap: 8 },

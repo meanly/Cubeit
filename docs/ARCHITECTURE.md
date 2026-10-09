@@ -90,12 +90,16 @@
   Knocks read through the whole body: the physics keeps a `recoil` spring
   (driven by every velocity change, kicked by wall hits) and a decaying
   `flail`, which the sprite spreads across hips, chest, head, arms and knees.
-- **UI chrome**: flat. A soft gray-green screen (`Backdrop`), white cards and
-  sheets, warm near-black ink for text, primary actions and the floating
-  nav pill (Home / Talk / Memories / Settings, vector icons in `ui/NavIcons`),
-  and four block colors for icon badges. The LCD sits in a little gadget
-  (`screens/DeviceFrame.tsx`); Play and Customize live on the home screen
-  (`screens/HomeCards.tsx`). Colors live in `theme/tokens.ts`.
+- **UI chrome**: flat. A soft gray-green screen (`ui/Backdrop`), white cards
+  and sheets, warm near-black ink for text and the floating nav pill (Home /
+  Talk / Memories / Settings), and one brand blue (`colors.brand`) for
+  highlights. Icons are platform-standard: SF Symbols on iOS, Material Symbols
+  on Android and web (`ui/Symbol`, via `expo-symbols`), with our own vector
+  icons (`ui/Icons`) as the fallback. The top bar is the
+  logo plus a notifications bell (the activity log, unread since
+  `progress.notificationsSeenAt`). The LCD sits in a little gadget
+  (`screens/DeviceFrame.tsx`); stats and Play / Customize / Friends live
+  under it (`screens/HomeCards.tsx`). Colors live in `theme/tokens.ts`.
 - **New behavior**: add a `Behavior` in `brain/behaviors.ts` and a weight in
   `choose()`. Use `ctx.wait` / `ctx.walkTo` so it stays interruptible.
 - **New game**: a scene component (reads `useWorld()`), registered in

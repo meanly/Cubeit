@@ -17,7 +17,7 @@ import { Room } from '../room/Room';
 import { TiltSensorHost } from '../sensors/TiltSensorHost';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors } from '../theme/tokens';
+
 import { Backdrop } from '../ui/Backdrop';
 import { Toasts } from '../ui/Toasts';
 import { ActionBar, ACTION_BAR_HEIGHT } from './ActionBar';
@@ -25,10 +25,13 @@ import { Header, HEADER_HEIGHT } from './Header';
 import { BEZEL, CHIN, DeviceFrame, deviceSize, HOUSING } from './DeviceFrame';
 import { HomeCards, HOME_CARDS_HEIGHT } from './HomeCards';
 import { Onboarding } from './Onboarding';
+import { useStyles, type Colors } from '../theme/theme';
 
 const SIDE = 16;
 /** The screen takes a little less than all the room it has, so it breathes. */
 const SCREEN_SCALE = 0.86;
+/** Space between the device and the stat cards. */
+const GROUP_GAP = 40;
 
 export function HomeScreen() {
   return (
@@ -39,6 +42,7 @@ export function HomeScreen() {
 }
 
 function HomeContent() {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [root, setRoot] = useState({ w: 0, h: 0 });
   const onboarded = useGame((s) => s.settings.onboarded);
@@ -47,33 +51,32 @@ function HomeContent() {
   useCharacterBrain();
   useDailyLife(onboarded);
 
-  const stageTop = insets.top + HEADER_HEIGHT;
-  const stageBottom = root.h - insets.bottom - ACTION_BAR_HEIGHT - HOME_CARDS_HEIGHT;
-  const stageH = Math.max(0, stageBottom - stageTop);
-  // A full-width ink card with the square LCD centered in it. Each dot is a
-  // whole number of device pixels so the dots stay crisp.
+  // The device and the cards below it form one group, centered between the
+  // logo bar and the nav, with a fixed gap between them and room above the nav.
+  const regionTop = insets.top + HEADER_HEIGHT + 8;
+  const regionBottom = root.h - insets.bottom - ACTION_BAR_HEIGHT - 8;
+  const regionH = Math.max(0, regionBottom - regionTop);
+  // The LCD: each dot a whole number of device pixels, so the dots stay crisp.
   const px = PixelRatio.get();
-  // The LCD (each dot a whole number of device pixels, so the dots stay
-  // crisp) mounted in its device, centered in the space between the greeting
-  // and the cards.
   const chromeW = (HOUSING + BEZEL) * 2;
   const chromeH = BEZEL * 2 + HOUSING + CHIN;
-  const space = Math.max(0, Math.min(root.w - SIDE * 2 - chromeW, 560, stageH - 24 - chromeH));
-  const fit = space * SCREEN_SCALE;
+  const fitW = (root.w - SIDE * 2 - chromeW) * SCREEN_SCALE;
+  const fitH = regionH - HOME_CARDS_HEIGHT - GROUP_GAP - chromeH;
+  const fit = Math.max(0, Math.min(fitW, fitH, 560));
   const roomW = (Math.floor((fit * px) / LCD_DOTS) * LCD_DOTS) / px;
   const roomH = roomW;
   const { width: frameW, height: frameH } = deviceSize(roomW);
-  // Must match the resting position computed in roomStyle below (translateY 0 when no panel is open).
-  const roomTop = stageTop + (stageH - frameH) / 2;
+  const groupH = frameH + GROUP_GAP + HOME_CARDS_HEIGHT;
+  const roomTop = regionTop + Math.max(0, (regionH - groupH) / 2);
+  const cardsTop = roomTop + frameH + GROUP_GAP;
 
-  // The open panel's top edge; the device scales down to fit above it.
+  // The open panel's top edge: the device slides up, then scales down, to stay above it.
   const panelTop = useSharedValue(10_000);
   const roomStyle = useAnimatedStyle(() => {
-    const bottom = Math.min(stageBottom, panelTop.value) - 10;
-    const available = bottom - stageTop - 4;
-    const scale = Math.max(0.3, Math.min(1, available / frameH));
-    const top = stageTop + 4 + (available - frameH * scale) / 2;
-    return { transform: [{ translateY: Math.min(0, top - roomTop) }, { scale }] };
+    const limit = panelTop.value - 10;
+    const scale = Math.max(0.3, Math.min(1, (limit - regionTop) / frameH));
+    const top = Math.max(regionTop, Math.min(roomTop, limit - frameH * scale));
+    return { transform: [{ translateY: top - roomTop }, { scale }] };
   });
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -104,15 +107,15 @@ function HomeContent() {
         </Animated.View>
       )}
       {ready && (
-        <View style={[styles.cards, { top: stageBottom }]} pointerEvents="box-none">
-          <HomeCards disabled={busy} />
+        <View style={[styles.cards, { top: cardsTop }]} pointerEvents="box-none">
+          <HomeCards width={frameW} disabled={busy} />
         </View>
       )}
       {ready && (
         <PanelHost
           panels={PANELS}
           rootHeight={root.h}
-          topReserve={stageTop + 150}
+          topReserve={regionTop + 150}
           bottomInset={insets.bottom + ACTION_BAR_HEIGHT}
           panelTop={panelTop}
         />
@@ -128,7 +131,8 @@ function HomeContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   // 'clip' (web) also prevents focus changes from scrolling the clipped content.
   root: { flex: 1, backgroundColor: colors.bg, overflow: Platform.OS === 'web' ? ('clip' as ViewStyle['overflow']) : 'hidden' },
   roomWrap: { position: 'absolute', transformOrigin: '50% 0%' },

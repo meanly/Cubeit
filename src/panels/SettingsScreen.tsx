@@ -13,16 +13,18 @@ import { feedback } from '../services/feedback';
 import { kv } from '../storage/kv';
 import { pickSave, useGame } from '../state/gameStore';
 import { useMemories } from '../state/memoryStore';
-import type { ActivityLevel, ReduceMotionPref } from '../state/schema';
+import type { ActivityLevel, AppearancePref, ReduceMotionPref } from '../state/schema';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { confirm, ConfirmHost } from '../ui/Confirm';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Slider } from '../ui/Slider';
 import { Backdrop } from '../ui/Backdrop';
 import { Toasts } from '../ui/Toasts';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 export function SettingsScreen() {
+  const styles = useStyles(makeStyles);
   const open = useUi((s) => s.settingsOpen);
   const close = () => useUi.getState().setSettingsOpen(false);
   return (
@@ -36,6 +38,8 @@ export function SettingsScreen() {
 }
 
 function SettingsContent({ onClose }: { onClose: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const settings = useGame((s) => s.settings);
   const name = useGame((s) => s.character.name);
@@ -62,6 +66,19 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
         <IconButton icon="close" label="Close settings" onPress={onClose} />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} keyboardShouldPersistTaps="handled">
+        <Section title="Appearance">
+          <Segmented<AppearancePref>
+            value={settings.appearance}
+            onChange={(v) => toggle({ appearance: v })}
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+          />
+          <Text style={styles.hint}>System follows your phone’s light or dark mode. The room’s screen looks the same either way.</Text>
+        </Section>
+
         <Section title="Motion">
           <Row label="Tilt controls" hint="Tilt your phone to move them around the room.">
             <Toggle label="Tilt controls" value={settings.motionEnabled} onChange={(v) => toggle({ motionEnabled: v })} />
@@ -163,6 +180,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
 }
 
 function MotionSettings() {
+  const styles = useStyles(makeStyles);
   const world = useWorld();
   const settings = useGame((s) => s.settings);
   const set = useGame((s) => s.setSettings);
@@ -218,6 +236,7 @@ function MotionSettings() {
 }
 
 function DataActions() {
+  const styles = useStyles(makeStyles);
   const world = useWorld();
   const count = useMemories((s) => s.items.length);
 
@@ -283,6 +302,7 @@ function DataActions() {
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -292,6 +312,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.row}>
       <View style={styles.flex}>
@@ -303,7 +324,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   screen: { backgroundColor: colors.bg },
   header: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 20, paddingRight: 16 },

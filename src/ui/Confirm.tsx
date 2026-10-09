@@ -3,8 +3,9 @@ import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { create } from 'zustand';
 
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { Button } from './primitives';
+import { useStyles, type Colors } from '../theme/theme';
 
 interface Request {
   title: string;
@@ -36,6 +37,7 @@ export function confirm(opts: { title: string; message: string; confirmLabel?: s
 }
 
 export function ConfirmHost({ scope }: { scope: 'home' | 'settings' }) {
+  const styles = useStyles(makeStyles);
   const request = useConfirmStore((s) => s.request);
   if (!request || request.scope !== scope) return null;
   const done = (ok: boolean) => {
@@ -60,7 +62,8 @@ export function ConfirmHost({ scope }: { scope: 'home' | 'settings' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: 24 },
   wrap: { width: '100%', maxWidth: 380 },
   card: { padding: 22, gap: 10, borderRadius: radii.xl, backgroundColor: colors.paper },

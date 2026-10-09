@@ -9,13 +9,16 @@ import type { EngineKind } from '../conversation/types';
 import { emit } from '../services/bus';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { Button, Chip, IconButton, PressableScale } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 const STARTERS = ['How are you?', 'What have you been up to?', 'Tell me a joke', 'Can you dance?', 'What do you remember?'];
 
 export function TalkPanel() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const name = useGame((s) => s.character.name);
   const entries = useChatSession((s) => s.entries);
   const busy = useChatSession((s) => s.busy);
@@ -160,6 +163,8 @@ function ProposalCard({
   onSave: () => void;
   onDismiss: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.proposal}>
       <View style={styles.proposalHead}>
@@ -184,7 +189,8 @@ function ProposalCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   enginePill: {
     flexDirection: 'row',

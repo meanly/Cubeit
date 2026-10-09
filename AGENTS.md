@@ -25,7 +25,7 @@ Run lint and typecheck before declaring any task done.
 
 ## Project conventions (Cubeit)
 
-- Single-screen app: the room is always visible; Talk / Play / Customize / Memories / Nearby are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used.
+- Single-screen app: the room is always visible; Talk / Play / Customize / Memories / Nearby / Notifications are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used.
 - Per-frame work (physics, sensor, animated styles) stays on the UI thread in worklets; JS moves bodies only through `world.commands`. See `docs/ARCHITECTURE.md`.
 - Write shared values with `.set()` (React Compiler lint rules flag `.value =` outside worklets).
 - Saved data shape changes need `SAVE_VERSION` + a migration in `src/state/migrations.ts`.

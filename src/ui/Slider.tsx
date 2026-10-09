@@ -3,8 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
+import { useStyles, type Colors } from '../theme/theme';
 
-import { colors } from '../theme/tokens';
 
 interface Props {
   value: number;
@@ -19,6 +19,7 @@ const THUMB = 26;
 
 /** Small dependency-free slider (drag or tap the track). Also adjustable with accessibility actions. */
 export function Slider({ value, min, max, step = 0.1, onChange, label }: Props) {
+  const styles = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
   const pos = useSharedValue(0);
   const range = max - min;
@@ -70,7 +71,8 @@ export function Slider({ value, min, max, step = 0.1, onChange, label }: Props) 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   wrap: { height: 40, justifyContent: 'center' },
   track: { position: 'absolute', left: THUMB / 2, right: THUMB / 2, height: 6, borderRadius: 3, backgroundColor: colors.surfacePressed },
   fill: { position: 'absolute', left: THUMB / 2, height: 6, borderRadius: 3, backgroundColor: colors.accent },

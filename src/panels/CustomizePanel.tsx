@@ -17,10 +17,11 @@ import { feedback } from '../services/feedback';
 import { defaultRoom, type RoomConfig } from '../state/schema';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { confirm } from '../ui/Confirm';
 import { Button, PressableScale, Segmented, StarCount } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 type Tab = 'room' | 'furniture' | 'look';
 
@@ -36,6 +37,8 @@ interface Selection {
  * live; nothing is saved until "Apply". Closing the panel discards the draft.
  */
 export function CustomizePanel() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const savedRoom = useGame((s) => s.room);
   const savedLook = useGame((s) => s.character.appearance);
   const progress = useGame((s) => s.progress);
@@ -187,6 +190,8 @@ export function CustomizePanel() {
 }
 
 function UnlockBar({ selection, stars }: { selection: Selection; stars: number }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const { unlock } = selection;
   if (unlock.kind === 'stars') {
     const affordable = stars >= unlock.cost;
@@ -216,6 +221,7 @@ function UnlockBar({ selection, stars }: { selection: Selection; stars: number }
 }
 
 function Row({ children }: { children: ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.row}>
       {children}
@@ -238,6 +244,8 @@ function OptionCard({
   onPress: () => void;
   preview: ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <PressableScale
       accessibilityRole="button"
@@ -260,7 +268,8 @@ function OptionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   tabs: { paddingHorizontal: 16, paddingBottom: 6 },
   content: { paddingBottom: 12 },
@@ -287,7 +296,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  optionSelected: { borderColor: colors.ink },
+  optionSelected: { borderColor: colors.brand },
   preview: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   optionName: { fontFamily: fonts.medium, fontSize: 12, color: colors.text, maxWidth: 76 },
   lock: {

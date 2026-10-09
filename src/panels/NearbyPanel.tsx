@@ -9,13 +9,16 @@ import type { NearbyPeer } from '../nearby/types';
 import { feedback } from '../services/feedback';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { Button } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 type Phase = 'intro' | 'searching' | 'found' | 'inviting' | 'declined';
 
 export function NearbyPanel() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const service = useMemo(() => createSimulatedNearby(), []);
   const name = useGame((s) => s.character.name);
   const [phase, setPhase] = useState<Phase>('intro');
@@ -106,6 +109,8 @@ export function NearbyPanel() {
 }
 
 function Bullet({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.bullet}>
       <Ionicons name={icon} size={18} color={colors.accent} />
@@ -114,7 +119,8 @@ function Bullet({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['n
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: 18, paddingBottom: 20, gap: 12 },
   badge: {
@@ -125,7 +131,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.yellowSoft,
+    backgroundColor: colors.warningSoft,
   },
   badgeText: { fontFamily: fonts.bold, fontSize: 12, color: colors.warning },
   title: { fontFamily: fonts.black, fontSize: 18, color: colors.text },

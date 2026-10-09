@@ -4,9 +4,10 @@ import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { Button, IconButton, StarCount } from '../ui/primitives';
 import { useGameSession } from './session';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 const INFO = {
   starCatch: {
@@ -25,6 +26,8 @@ const INFO = {
  * never mistaken for room gestures): intro, score/time, pause, results.
  */
 export function GameHud() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const s = useGameSession();
   const name = useGame((st) => st.character.name);
   const tilt = useGame((st) => st.settings.motionEnabled);
@@ -108,6 +111,7 @@ export function GameHud() {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.cardWrap} pointerEvents="box-none">
       <Animated.View entering={ZoomIn.duration(200)} style={styles.card}>
@@ -117,7 +121,8 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   top: { position: 'absolute', top: 18, left: 18, right: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
   pill: {

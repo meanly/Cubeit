@@ -1,50 +1,56 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { StickmanPreview } from '../character/StickmanPreview';
-import { MOOD_TEXT, moodLabel } from '../character/mood';
 import { useGame } from '../state/gameStore';
-import { colors, fonts, moodColors } from '../theme/tokens';
+import { useUi } from '../state/uiStore';
 
-export const HEADER_HEIGHT = 72;
+import { Logo } from '../ui/Logo';
+import { PressableScale } from '../ui/primitives';
+import { AppSymbol } from '../ui/Symbol';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
-/** "Welcome back" greeting with the character's mood, and a round avatar tinted by that mood. */
+export const HEADER_HEIGHT = 60;
+
+/** Logo centered at the top; notifications on the right, with a dot when something new happened. */
 export function Header() {
-  const name = useGame((s) => s.character.name);
-  const label = useGame((s) => moodLabel(s.mood));
-  const accessory = useGame((s) => s.character.appearance.accessory);
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
+  const unread = useGame((s) => s.progress.activities.some((a) => a.at > s.progress.notificationsSeenAt));
+  const open = useUi((s) => s.panel === 'notifications');
   return (
     <View style={styles.bar} pointerEvents="box-none">
-      <View style={styles.greeting} accessibilityRole="header">
-        <Text style={styles.title} numberOfLines={1}>
-          Welcome back,
-        </Text>
-        <Text style={styles.title} numberOfLines={1}>
-          {name} is {MOOD_TEXT[label].toLowerCase()}!
-        </Text>
-      </View>
-      <View
-        style={[styles.avatar, { backgroundColor: moodColors[label] }]}
-        accessibilityLabel={`${name} feels ${MOOD_TEXT[label]}`}
-      >
-        <View style={styles.avatarInner}>
-          <StickmanPreview accessory={accessory} size={30} />
-        </View>
+      <View style={styles.side} />
+      <Logo size={20} />
+      <View style={[styles.side, styles.right]}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={unread ? 'Notifications, new activity' : 'Notifications'}
+          hitSlop={6}
+          onPress={() => useUi.getState().openPanel(open ? 'none' : 'notifications')}
+          style={styles.bell}
+        >
+          <AppSymbol name="bell" size={20} color={colors.text} filled={false} weight="medium" />
+          {unread && <View style={styles.dot} />}
+        </PressableScale>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    height: HEADER_HEIGHT,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+  bar: { height: HEADER_HEIGHT, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+  side: { flex: 1 },
+  right: { alignItems: 'flex-end' },
+  bell: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  dot: {
+    position: 'absolute',
+    top: 10,
+    right: 11,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.brand,
+    borderWidth: 1.5,
+    borderColor: colors.paper,
   },
-  greeting: { flexShrink: 1 },
-  title: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 26, color: colors.text, letterSpacing: -0.3 },
-  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarInner: { width: 30, height: 30, borderRadius: 6, overflow: 'hidden' },
 });

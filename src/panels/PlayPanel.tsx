@@ -7,28 +7,30 @@ import { chaseBall } from '../character/brain/behaviors';
 import type { GameId } from '../state/schema';
 import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
-import { IconBadge, PressableScale, type IconName } from '../ui/primitives';
+import { fonts, radii } from '../theme/tokens';
+import type { IconId } from '../ui/Icons';
+import { IconBadge, PressableScale } from '../ui/primitives';
 import { PanelHeader } from './PanelHost';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
-const GAMES: { id: GameId; title: string; blurb: string; icon: IconName; tint: string }[] = [
+const GAMES: { id: GameId; title: string; blurb: string; icon: IconId }[] = [
   {
     id: 'starCatch',
     title: 'Star Catch',
     blurb: 'Tilt your phone (or drag on the floor) to help catch falling stars.',
     icon: 'star',
-    tint: colors.yellow,
   },
   {
     id: 'peekaboo',
     title: 'Peekaboo',
     blurb: 'Watch which box they hide in, follow the shuffle, then tap the right one.',
     icon: 'cube',
-    tint: colors.blue,
   },
 ];
 
 export function PlayPanel() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const best = useGame((s) => s.progress.bestScores);
   const hasBall = useGame((s) => s.room.items.toy === 'ball');
   const name = useGame((s) => s.character.name);
@@ -45,7 +47,7 @@ export function PlayPanel() {
             onPress={() => start(g.id)}
             style={styles.card}
           >
-            <IconBadge icon={g.icon} color={g.tint} size={44} />
+            <IconBadge icon={g.icon} size={44} />
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle}>{g.title}</Text>
               <Text style={styles.cardText}>{g.blurb}</Text>
@@ -65,7 +67,7 @@ export function PlayPanel() {
             }}
             style={[styles.mini, !hasBall && { opacity: 0.45 }]}
           >
-            <IconBadge icon="basketball" color={colors.red} size={36} />
+            <IconBadge icon="ball" size={36} />
             <Text style={styles.miniTitle}>Play ball</Text>
             <Text style={styles.miniText}>{hasBall ? `${name} chases the ball` : 'Add the ball in Customize'}</Text>
           </PressableScale>
@@ -75,7 +77,7 @@ export function PlayPanel() {
             onPress={() => useUi.getState().openPanel('nearby')}
             style={styles.mini}
           >
-            <IconBadge icon="people" color={colors.teal} size={36} />
+            <IconBadge icon="friends" size={36} />
             <Text style={styles.miniTitle}>Nearby friends</Text>
             <Text style={styles.miniText}>Preview · simulation</Text>
           </PressableScale>
@@ -85,7 +87,8 @@ export function PlayPanel() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   list: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
   card: {
@@ -99,7 +102,7 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, gap: 3 },
   cardTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
   cardText: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.textDim },
-  best: { fontFamily: fonts.bold, fontSize: 12, color: colors.red, marginTop: 2 },
+  best: { fontFamily: fonts.bold, fontSize: 12, color: colors.brand, marginTop: 2 },
   row: { flexDirection: 'row', gap: 10 },
   mini: {
     flex: 1,

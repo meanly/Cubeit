@@ -21,6 +21,24 @@ describe('save migration and repair', () => {
     expect(migrateSave(JSON.parse(JSON.stringify(old)), 2_000).data.room.items.rug).toBe('stripedRug');
   });
 
+  it('v2 saves treat their existing activity log as already read', () => {
+    const old = createDefaultSave(1_000) as unknown as Record<string, any>;
+    old.version = 2;
+    delete old.progress.notificationsSeenAt;
+    old.progress.activities = [{ at: 1_500, kind: 'nap', text: 'took a nap' }];
+    expect(migrateSave(JSON.parse(JSON.stringify(old)), 9_000).data.progress.notificationsSeenAt).toBe(1_500);
+  });
+
+  it('v3 saves follow the system appearance; invalid values are repaired', () => {
+    const old = createDefaultSave(1_000) as unknown as Record<string, any>;
+    old.version = 3;
+    delete old.settings.appearance;
+    expect(migrateSave(JSON.parse(JSON.stringify(old)), 2_000).data.settings.appearance).toBe('system');
+    const bad = createDefaultSave(1_000) as unknown as Record<string, any>;
+    bad.settings.appearance = 'sepia';
+    expect(migrateSave(bad, 2_000).data.settings.appearance).toBe('system');
+  });
+
   it('recovers from garbage with sensible defaults', () => {
     const { data } = migrateSave('not an object', 5_000);
     expect(data.version).toBe(SAVE_VERSION);

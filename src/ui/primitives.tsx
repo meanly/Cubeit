@@ -4,7 +4,10 @@ import { Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp,
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { feedback } from '../services/feedback';
-import { colors, fonts, radii, type } from '../theme/tokens';
+import type { IconId } from './Icons';
+import { AppSymbol } from './Symbol';
+import { fonts, radii, type } from '../theme/tokens';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -63,7 +66,9 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
 }) {
-  const bg = tone === 'primary' ? colors.ink : tone === 'danger' ? colors.dangerSoft : tone === 'secondary' ? colors.surface : 'transparent';
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
+  const bg = tone === 'primary' ? colors.brand : tone === 'danger' ? colors.dangerSoft : tone === 'secondary' ? colors.surface : 'transparent';
   const fg = tone === 'primary' ? colors.onInk : tone === 'danger' ? colors.danger : tone === 'ghost' ? colors.textDim : colors.text;
   return (
     <PressableScale
@@ -91,7 +96,7 @@ export function IconButton({
   onPress,
   label,
   size = 22,
-  color = colors.text,
+  color,
   style,
 }: {
   icon: IconName;
@@ -101,6 +106,8 @@ export function IconButton({
   color?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <PressableScale
       accessibilityRole="button"
@@ -109,7 +116,7 @@ export function IconButton({
       onPress={onPress}
       style={[styles.iconButton, style]}
     >
-      <Ionicons name={icon} size={size} color={color} />
+      <Ionicons name={icon} size={size} color={color ?? colors.text} />
     </PressableScale>
   );
 }
@@ -125,6 +132,8 @@ export function Chip({
   onPress: () => void;
   icon?: IconName;
 }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <PressableScale
       accessibilityRole="button"
@@ -132,13 +141,15 @@ export function Chip({
       onPress={onPress}
       style={[styles.chip, selected && styles.chipSelected]}
     >
-      {icon && <Ionicons name={icon} size={14} color={selected ? colors.onInk : colors.textDim} />}
-      <Text style={[styles.chipLabel, selected && { color: colors.onInk }]}>{label}</Text>
+      {icon && <Ionicons name={icon} size={14} color={selected ? colors.onAccent : colors.textDim} />}
+      <Text style={[styles.chipLabel, selected && { color: colors.onAccent }]}>{label}</Text>
     </PressableScale>
   );
 }
 
 export function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const progress = useSharedValue(value ? 1 : 0);
   useEffect(() => {
     progress.set(withTiming(value ? 1 : 0, { duration: 160 }));
@@ -154,7 +165,7 @@ export function Toggle({ value, onChange, label }: { value: boolean; onChange: (
       hitSlop={8}
       style={styles.toggle}
     >
-      <Animated.View style={[styles.toggleTrack, { backgroundColor: value ? colors.ink : colors.surfacePressed }, track]} />
+      <Animated.View style={[styles.toggleTrack, { backgroundColor: value ? colors.brand : colors.surfacePressed }, track]} />
       <Animated.View style={[styles.toggleKnob, knob]} />
     </PressableScale>
   );
@@ -169,6 +180,8 @@ export function Segmented<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
       {options.map((o) => {
@@ -189,24 +202,19 @@ export function Segmented<T extends string>({
   );
 }
 
-/**
- * The reference's outlined square icon: a block color inside a thick ink
- * border, with an ink glyph on top.
- */
-export function IconBadge({ icon, color, size = 40 }: { icon: IconName; color: string; size?: number }) {
+/** A platform-standard glyph in the brand color, in a square box for alignment (no backdrop shape). */
+export function IconBadge({ icon, size = 40, color }: { icon: IconId; size?: number; color?: string }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
-    <View
-      style={[
-        styles.badge,
-        { width: size, height: size, borderRadius: size * 0.3, backgroundColor: color, borderWidth: Math.max(2, size * 0.065) },
-      ]}
-    >
-      <Ionicons name={icon} size={size * 0.5} color={colors.ink} />
+    <View style={[styles.badge, { width: size, height: size }]}>
+      <AppSymbol name={icon} size={size * 0.62} color={color ?? colors.brand} />
     </View>
   );
 }
 
 export function SectionTitle({ children, right }: { children: string; right?: ReactNode }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.sectionTitle}>
       <Text style={styles.sectionText}>{children}</Text>
@@ -216,6 +224,8 @@ export function SectionTitle({ children, right }: { children: string; right?: Re
 }
 
 export function StarCount({ value, size = 14 }: { value: number; size?: number }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.starCount} accessibilityLabel={`${value} stars`}>
       <Ionicons name="star" size={size} color={colors.star} />
@@ -224,7 +234,8 @@ export function StarCount({ value, size = 14 }: { value: number; size?: number }
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   button: {
     minHeight: 50,
     borderRadius: radii.md,
@@ -254,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm + 2,
     backgroundColor: colors.surface,
   },
-  chipSelected: { backgroundColor: colors.ink },
+  chipSelected: { backgroundColor: colors.brand },
   chipLabel: { ...type.label, color: colors.textDim },
   toggle: { width: 48, height: 28, justifyContent: 'center' },
   toggleTrack: { ...StyleSheet.absoluteFill, borderRadius: 14 },
@@ -277,14 +288,14 @@ const styles = StyleSheet.create({
   },
   segment: { flex: 1, minHeight: 36, borderRadius: radii.sm, alignItems: 'center', justifyContent: 'center' },
   segmentSelected: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.segment,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
   segmentLabel: { ...type.label, color: colors.textDim },
-  badge: { alignItems: 'center', justifyContent: 'center', borderColor: colors.ink },
+  badge: { alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 10 },
   sectionText: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
   starCount: { flexDirection: 'row', alignItems: 'center', gap: 4 },

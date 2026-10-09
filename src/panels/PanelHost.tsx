@@ -13,8 +13,9 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useUi, type PanelId } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { IconButton } from '../ui/primitives';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 export type OpenPanel = Exclude<PanelId, 'none'>;
 
@@ -25,6 +26,7 @@ const PANEL_HEIGHT: Record<OpenPanel, number> = {
   customize: 0.5,
   memories: 0.6,
   nearby: 0.5,
+  notifications: 0.55,
 };
 
 interface Props {
@@ -39,6 +41,7 @@ interface Props {
 
 /** Bottom sheet that hosts one panel at a time and keeps the room visible above it. */
 export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTop }: Props) {
+  const styles = useStyles(makeStyles);
   const panel = useUi((s) => s.panel);
   const closePanel = useUi((s) => s.closePanel);
   // Keep rendering the last panel while the sheet slides closed.
@@ -106,6 +109,8 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
 
 /** Title row used at the top of every panel. */
 export function PanelHeader({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const closePanel = useUi((s) => s.closePanel);
   return (
     <View style={styles.header}>
@@ -124,10 +129,12 @@ export function PanelHeader({ title, right, onBack }: { title: string; right?: R
 }
 
 export function EmptyState({ icon, title, body }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; body: string }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={26} color={colors.ink} />
+        <Ionicons name={icon} size={26} color={colors.brand} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyBody}>{body}</Text>
@@ -135,7 +142,8 @@ export function EmptyState({ icon, title, body }: { icon: React.ComponentProps<t
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   // A flat white sheet with big top corners, lifted by a soft shadow.
   sheet: {
     position: 'absolute',
@@ -175,9 +183,7 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 16,
-    backgroundColor: colors.yellow,
-    borderWidth: 2.5,
-    borderColor: colors.ink,
+    backgroundColor: colors.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,

@@ -37,6 +37,7 @@ export interface GameStore extends SaveData {
   awardXp(reason: XpReason, now?: number): { gained: number; leveledUpTo: number | null };
   recordGame(game: GameId, score: number): { newBest: boolean; previousBest: number; starsEarned: number };
   logActivity(kind: ActivityKind, text: string, now?: number): void;
+  markNotificationsSeen(now?: number): void;
   nudgeMood(dValence: number, dEnergy: number, now?: number): void;
   settleMood(now?: number): void;
   /** Personality drifts slowly with what you do together. */
@@ -128,6 +129,8 @@ export const useGame = create<GameStore>()((set, get) => ({
     set((s) => ({
       progress: { ...s.progress, activities: [...s.progress.activities, { at: now, kind, text }].slice(-20) },
     })),
+
+  markNotificationsSeen: (now = Date.now()) => set((s) => ({ progress: { ...s.progress, notificationsSeenAt: now } })),
 
   nudgeMood: (dValence, dEnergy, now = Date.now()) =>
     set((s) => ({ mood: nudgeMood(s.mood, dValence, dEnergy, now) })),

@@ -8,11 +8,14 @@ import Svg, { Polygon } from 'react-native-svg';
 import { StickmanPreview } from '../character/StickmanPreview';
 import { DEFAULT_NAME } from '../state/schema';
 import { useGame } from '../state/gameStore';
-import { colors, fonts, radii } from '../theme/tokens';
+import { fonts, radii } from '../theme/tokens';
 import { PressableScale } from '../ui/primitives';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
 /** First launch: name your cubeling and learn the three basics. Shown once. */
 export function Onboarding() {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<'name' | 'tips'>('name');
   const [name, setName] = useState(DEFAULT_NAME);
@@ -70,14 +73,17 @@ export function Onboarding() {
 
 /** The round ink button with a chevron. */
 function Next({ label, onPress }: { label: string; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   return (
     <PressableScale accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.next}>
-      <Ionicons name="chevron-forward" size={24} color={colors.onInk} />
+      <Ionicons name="chevron-forward" size={24} color={colors.brand} />
     </PressableScale>
   );
 }
 
 function Tip({ n, text }: { n: number; text: string }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.tip}>
       <View style={styles.tipNum}>
@@ -90,18 +96,21 @@ function Tip({ n, text }: { n: number; text: string }) {
 
 const BLOCK = 46;
 const DEPTH = 12;
-/** A 3×3 wall of extruded blocks; the stickman lives in the middle one. */
+/** Brand tints for the cubes, from pale to deep, with white; the extrusions are a deep navy. */
+const TINT = { pale: '#D3E1EC', mid: '#8FB3CF', deep: '#1F4560', depth: '#15304A' };
 /** Outline of a face plus its extrusion toward the lower left. */
 const EXTRUSION = `${DEPTH},0 ${DEPTH + BLOCK},0 ${DEPTH + BLOCK},${BLOCK} ${BLOCK},${BLOCK + DEPTH} 0,${BLOCK + DEPTH} 0,${DEPTH}`;
-const GRID_COLORS: (string | null)[] = [colors.red, colors.ink, '#FFFFFF', colors.red, null, colors.blue, colors.blue, colors.red, colors.teal];
+/** A 3×3 wall of extruded blocks; the stickman lives in the middle one. */
+const GRID_COLORS: (string | null)[] = [TINT.mid, TINT.deep, '#FFFFFF', TINT.pale, null, TINT.mid, TINT.deep, '#FFFFFF', TINT.pale];
 
 function Blocks() {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.blocks} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {GRID_COLORS.map((c, i) => (
         <View key={i} style={styles.blockCell}>
           <Svg style={StyleSheet.absoluteFill} width={BLOCK + DEPTH} height={BLOCK + DEPTH}>
-            <Polygon points={EXTRUSION} fill={colors.ink} />
+            <Polygon points={EXTRUSION} fill={TINT.depth} />
           </Svg>
           <View style={[styles.block, c ? { backgroundColor: c } : styles.blockLcd]}>{!c && <StickmanPreview accessory="none" size={BLOCK} />}</View>
         </View>
@@ -110,13 +119,14 @@ function Blocks() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
   flex: { flex: 1 },
-  screen: { ...StyleSheet.absoluteFill, backgroundColor: colors.yellow, paddingHorizontal: 28 },
+  screen: { ...StyleSheet.absoluteFill, backgroundColor: colors.brand, paddingHorizontal: 28 },
   art: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { gap: 14, alignItems: 'center', maxWidth: 440, width: '100%', alignSelf: 'center' },
-  title: { fontFamily: fonts.black, fontSize: 28, lineHeight: 34, color: colors.ink, textAlign: 'center', letterSpacing: -0.5 },
-  sub: { fontFamily: fonts.medium, fontSize: 15, color: colors.inkSoft, textAlign: 'center' },
+  title: { fontFamily: fonts.black, fontSize: 28, lineHeight: 34, color: '#FFFFFF', textAlign: 'center', letterSpacing: -0.5 },
+  sub: { fontFamily: fonts.medium, fontSize: 15, color: TINT.pale, textAlign: 'center' },
   input: {
     alignSelf: 'stretch',
     height: 54,
@@ -133,17 +143,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.ink,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   tip: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', alignSelf: 'stretch' },
-  tipNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.yellow },
-  tipText: { flex: 1, fontFamily: fonts.medium, fontSize: 15, lineHeight: 21, color: colors.ink },
-  privacy: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkSoft, textAlign: 'center' },
+  tipNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  tipNumText: { fontFamily: fonts.black, fontSize: 13, color: colors.brand },
+  tipText: { flex: 1, fontFamily: fonts.medium, fontSize: 15, lineHeight: 21, color: '#FFFFFF' },
+  privacy: { fontFamily: fonts.medium, fontSize: 13, color: TINT.pale, textAlign: 'center' },
   blocks: { width: (BLOCK + DEPTH) * 3, flexDirection: 'row', flexWrap: 'wrap' },
   blockCell: { width: BLOCK + DEPTH, height: BLOCK + DEPTH },
   block: { position: 'absolute', left: DEPTH, top: 0, width: BLOCK, height: BLOCK, overflow: 'hidden' },
-  blockLcd: { backgroundColor: colors.ink },
+  blockLcd: { backgroundColor: TINT.depth },
 });

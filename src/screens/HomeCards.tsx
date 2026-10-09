@@ -1,42 +1,69 @@
-import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
+import { useShallow } from 'zustand/react/shallow';
 
-import { bondLevel } from '../progression/progression';
+import { bondProgress } from '../progression/progression';
 import { useGame } from '../state/gameStore';
 import { useUi, type PanelId } from '../state/uiStore';
-import { colors, fonts, radii } from '../theme/tokens';
-import { IconBadge, PressableScale, type IconName } from '../ui/primitives';
+import { fonts, radii } from '../theme/tokens';
+import type { IconId } from '../ui/Icons';
+import { PressableScale } from '../ui/primitives';
+import { AppSymbol } from '../ui/Symbol';
+import { useColors, useStyles, type Colors } from '../theme/theme';
 
-/** Height of everything below the room: stats row, section title and the two tiles. */
-export const HOME_CARDS_HEIGHT = 196;
+const STATS_H = 62;
+const TITLE_GAP_TOP = 18;
+const TITLE_H = 20;
+const TITLE_GAP_BOTTOM = 10;
+const TILE_H = 76;
+/** Height of everything below the device: two stat cards, the section title and the tiles. */
+export const HOME_CARDS_HEIGHT = STATS_H + TITLE_GAP_TOP + TITLE_H + TITLE_GAP_BOTTOM + TILE_H;
 
-const TILES: { panel: PanelId; title: string; sub: string; icon: IconName; color: string }[] = [
-  { panel: 'play', title: 'Play', sub: 'Games & ball', icon: 'game-controller', color: colors.red },
-  { panel: 'customize', title: 'Customize', sub: 'Room & looks', icon: 'color-palette', color: colors.blue },
+const TILES: { panel: PanelId; title: string; icon: IconId }[] = [
+  { panel: 'play', title: 'Play', icon: 'play' },
+  { panel: 'customize', title: 'Customize', icon: 'customize' },
+  { panel: 'nearby', title: 'Friends', icon: 'friends' },
 ];
 
-/** Under the room: stars and friendship, then Play and Customize. */
-export function HomeCards({ disabled }: { disabled?: boolean }) {
+/**
+ * Under the device, and exactly as wide as it: the star balance and
+ * friendship level, then Play, Customize and Friends.
+ */
+export function HomeCards({ width, disabled }: { width: number; disabled?: boolean }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
   const stars = useGame((s) => s.progress.stars);
-  const level = useGame((s) => bondLevel(s.progress.bondXp));
+  const bond = useGame(useShallow((s) => bondProgress(s.progress.bondXp)));
   const openPanel = useUi((s) => s.openPanel);
+  const maxed = bond.toNext === null;
   return (
-    <View style={[styles.wrap, disabled && styles.disabled]} pointerEvents={disabled ? 'none' : 'box-none'}>
-      <View style={styles.row} accessibilityLabel={`${stars} stars, friendship level ${level}`}>
-        <Ionicons name="star" size={18} color={colors.star} />
-        <Text style={styles.rowTitle}>Stars</Text>
-        <Text style={styles.rowSub}>Friendship Lv {level}</Text>
-        <Text style={styles.rowValue}>{stars}</Text>
+    <View style={[styles.wrap, { width }, disabled && styles.disabled]} pointerEvents={disabled ? 'none' : 'box-none'}>
+      <View style={styles.stats}>
+        <View style={styles.stat} accessibilityLabel={`${stars} stars`}>
+          <Text style={styles.caption}>STARS</Text>
+          <View style={styles.valueRow}>
+            <AppSymbol name="star" size={16} color={colors.star} />
+            <Text style={styles.value}>{stars.toLocaleString()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.stat} accessibilityLabel={`Friendship level ${bond.level}${maxed ? ', maxed' : `, ${bond.toNext} XP to the next level`}`}>
+          <Text style={styles.caption}>FRIENDSHIP</Text>
+          <View style={styles.valueRow}>
+            <AppSymbol name="heart" size={16} color={colors.brand} />
+            <Text style={styles.value}>
+              <Text style={styles.unit}>Lv </Text>
+              {bond.level}
+            </Text>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: `${Math.round(Math.min(1, Math.max(0, bond.fraction)) * 100)}%` }]} />
+            </View>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.sectionRow}>
-        <Text style={styles.section} accessibilityRole="header">
-          Things to do
-        </Text>
-        <PressableScale accessibilityRole="button" hitSlop={8} onPress={() => openPanel('nearby')}>
-          <Text style={styles.link}>Nearby</Text>
-        </PressableScale>
-      </View>
+      <Text style={styles.section} accessibilityRole="header">
+        Things to do
+      </Text>
 
       <View style={styles.tiles}>
         {TILES.map((t) => (
@@ -47,11 +74,8 @@ export function HomeCards({ disabled }: { disabled?: boolean }) {
             onPress={() => openPanel(t.panel)}
             style={styles.tile}
           >
-            <IconBadge icon={t.icon} color={t.color} size={38} />
-            <View style={styles.tileText}>
-              <Text style={styles.tileTitle}>{t.title}</Text>
-              <Text style={styles.tileSub}>{t.sub}</Text>
-            </View>
+            <AppSymbol name={t.icon} size={20} color={colors.brand} />
+            <Text style={styles.tileTitle}>{t.title}</Text>
           </PressableScale>
         ))}
       </View>
@@ -59,36 +83,29 @@ export function HomeCards({ disabled }: { disabled?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { height: HOME_CARDS_HEIGHT, width: '100%', maxWidth: 592, paddingHorizontal: 16, paddingTop: 12 },
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+  wrap: { height: HOME_CARDS_HEIGHT },
   disabled: { opacity: 0.45 },
-  row: {
-    height: 56,
-    borderRadius: radii.lg,
-    backgroundColor: colors.paper,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 8,
+  stats: { flexDirection: 'row', gap: 10, height: STATS_H },
+  stat: { flex: 1, borderRadius: radii.md, backgroundColor: colors.paper, paddingHorizontal: 14, justifyContent: 'center', gap: 4 },
+  caption: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 0.8, color: colors.textFaint },
+  valueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  value: { fontFamily: fonts.black, fontSize: 20, lineHeight: 24, color: colors.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+  unit: { fontFamily: fonts.bold, fontSize: 13, color: colors.textFaint, letterSpacing: 0 },
+  track: { flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.brandSoft, overflow: 'hidden', marginLeft: 4 },
+  fill: { height: 5, borderRadius: 3, backgroundColor: colors.brand },
+  section: {
+    height: TITLE_H,
+    marginTop: TITLE_GAP_TOP,
+    marginBottom: TITLE_GAP_BOTTOM,
+    fontFamily: fonts.bold,
+    fontSize: 15,
+    lineHeight: TITLE_H,
+    color: colors.text,
+    letterSpacing: -0.2,
   },
-  rowTitle: { fontFamily: fonts.black, fontSize: 16, color: colors.text },
-  rowSub: { flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.textDim, marginLeft: 6 },
-  rowValue: { fontFamily: fonts.bold, fontSize: 17, color: colors.text },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 10 },
-  section: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  link: { fontFamily: fonts.medium, fontSize: 14, color: colors.textDim },
-  tiles: { flexDirection: 'row', gap: 12 },
-  tile: {
-    flex: 1,
-    height: 84,
-    borderRadius: radii.lg,
-    backgroundColor: colors.paper,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  tileText: { flex: 1, gap: 2 },
-  tileTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.text },
-  tileSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.textFaint },
+  tiles: { flexDirection: 'row', gap: 10 },
+  tile: { flex: 1, height: TILE_H, borderRadius: radii.md, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center', gap: 7 },
+  tileTitle: { fontFamily: fonts.bold, fontSize: 12, color: colors.text },
 });

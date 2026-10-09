@@ -8,7 +8,7 @@ import type { LightId, ThemeId } from '../content/themes';
  * document (`SaveData`), plus a separate memories document. Bump
  * SAVE_VERSION and add a step to `migrations.ts` whenever the shape changes.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 4;
 export const SAVE_KEY = 'cubeit.save';
 
 export interface Personality {
@@ -70,10 +70,14 @@ export interface Progress {
   visitDays: number;
   milestones: string[];
   activities: ActivityEntry[];
+  /** When the notifications sheet was last opened; newer activities show the unread dot. */
+  notificationsSeenAt: number;
   stats: { taps: number; pets: number; chats: number; visits: number };
 }
 
 export type ReduceMotionPref = 'system' | 'on' | 'off';
+/** Light / dark appearance; 'system' follows the phone. */
+export type AppearancePref = 'system' | 'light' | 'dark';
 export type ActivityLevel = 'calm' | 'normal' | 'lively';
 
 /** Raw gravity vector (m/s²) captured as the neutral holding position. */
@@ -92,6 +96,7 @@ export interface Settings {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   reduceMotion: ReduceMotionPref;
+  appearance: AppearancePref;
   activityLevel: ActivityLevel;
   nightSleep: boolean;
   recordMilestones: boolean;
@@ -122,6 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
   hapticsEnabled: true,
   reduceMotion: 'system',
+  appearance: 'system',
   activityLevel: 'normal',
   nightSleep: true,
   recordMilestones: true,
@@ -154,6 +160,7 @@ export function createDefaultSave(now: number = Date.now(), rng: () => number = 
       gamesPlayed: {},
       lastVisitDay: null,
       lastSeenAt: now,
+      notificationsSeenAt: now,
       visitDays: 0,
       milestones: [],
       activities: [],

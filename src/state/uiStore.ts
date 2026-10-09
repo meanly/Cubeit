@@ -4,7 +4,7 @@ import type { Appearance } from '../content/appearance';
 import type { RoomConfig, GameId } from './schema';
 import type { CharacterState, EmoteId } from '../character/states';
 
-export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'memories' | 'nearby';
+export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'memories' | 'nearby' | 'notifications';
 
 export interface Toast {
   id: number;
