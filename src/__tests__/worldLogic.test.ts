@@ -1,6 +1,6 @@
 import { circadianEnergy, driftMood, moodLabel } from '../character/mood';
 import { characterRect, makeGeometry, projectX, projectY, unprojectFloor, WORLD } from '../physics/geometry';
-import { shapeTilt, stepBall, stepBody, stepTilt } from '../physics/simulation';
+import { bodyHalfX, shapeTilt, stepBall, stepBody, stepTilt } from '../physics/simulation';
 import { initialBall, initialBody, initialTilt, PhysicsEvent, type PhysicsParams } from '../physics/types';
 import { bondLevel, bondProgress, dailyCheck, dayKey, daysBetween, starsForGame } from '../progression/progression';
 
@@ -114,17 +114,35 @@ describe('character physics', () => {
     expect(b.flail).toBe(0);
   });
 
-  it('is knocked over by a hard tilt, slides head-first into the wall, then gets up', () => {
+  it('topples over on a hard tilt, falls into the wall and crumples head-first into the corner, then gets up', () => {
     const b = initialBody(0.5, 0.3);
     const t = { ...initialTilt(), x: -1 };
     const events: number[] = [];
-    for (let i = 0; i < 300; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, events);
+    const angles: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
+      angles.push(b.rot);
+    }
     expect(b.fallen).toBeGreaterThan(0);
     expect(b.fallDir).toBe(-1);
-    expect(b.x).toBeCloseTo(WORLD.lieHalf, 2);
+    // He tips over gradually (passing through in-between angles), not in one frame.
+    expect(angles.some((a) => a < -0.3 && a > -1.2)).toBe(true);
+    // The tilt makes that wall "down": head jammed into the corner, past flat.
+    expect(b.rot).toBeLessThan(-Math.PI / 2 - 0.5);
+    expect(b.x).toBeCloseTo(bodyHalfX(b.rot), 3);
+    expect(events).toContain(PhysicsEvent.Land);
     t.x = 0;
-    for (let i = 300; i < 420; i++) stepBody(b, t, params(), g, 1 / 60, i / 60, events);
+    for (let i = 300; i < 480; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, events);
     expect(b.fallen).toBe(0);
+    expect(Math.abs(b.rot)).toBeLessThan(0.01);
+  });
+
+  it('lies flat (not in the corner) when knocked over by a milder tilt', () => {
+    const b = initialBody(0.5, 0.3);
+    const t = { ...initialTilt(), x: -0.55 };
+    for (let i = 0; i < 400; i++) stepBody(b, t, params(), g, 1 / 60, 10 + i / 60, []);
+    expect(b.rot).toBeLessThan(-Math.PI / 2 + 0.05);
+    expect(b.rot).toBeGreaterThan(-Math.PI / 2 - 0.25);
   });
 
   it('falls up and bumps the ceiling when the screen is tipped over, then drops back', () => {

@@ -55,7 +55,7 @@ describe('room pixel art', () => {
     }
     for (const slot of ['wallLeft', 'wallRight', 'ceiling'] as const) {
       const r = SLOT_DOTS[slot];
-      // The stickman is 25 dots tall.
+      // The stickman is 21 dots tall; keep the old 25-dot clearance.
       expect(r.y + r.h).toBeLessThanOrEqual(LCD_DOTS - 26);
     }
   });

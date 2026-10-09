@@ -11,6 +11,16 @@ describe('save migration and repair', () => {
     expect(data).toEqual(save);
   });
 
+  it('starts with no rug, and v1 saves on the old default round rug lose it', () => {
+    expect(createDefaultSave(1_000).room.items.rug).toBeNull();
+    const old = createDefaultSave(1_000) as unknown as Record<string, any>;
+    old.version = 1;
+    old.room.items.rug = 'roundRug';
+    expect(migrateSave(JSON.parse(JSON.stringify(old)), 2_000).data.room.items.rug).toBeNull();
+    old.room.items.rug = 'stripedRug';
+    expect(migrateSave(JSON.parse(JSON.stringify(old)), 2_000).data.room.items.rug).toBe('stripedRug');
+  });
+
   it('recovers from garbage with sensible defaults', () => {
     const { data } = migrateSave('not an object', 5_000);
     expect(data.version).toBe(SAVE_VERSION);

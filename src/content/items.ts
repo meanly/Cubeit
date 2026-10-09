@@ -90,7 +90,8 @@ export const DEFAULT_ITEMS: RoomItems = {
   corner: 'plant',
   wallLeft: 'window',
   wallRight: 'poster',
-  rug: 'roundRug',
+  // No rug by default: it crowded the floor the stickman stands on.
+  rug: null,
   ceiling: 'stringLights',
   toy: 'ball',
 };

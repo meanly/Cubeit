@@ -8,7 +8,7 @@ import type { LightId, ThemeId } from '../content/themes';
  * document (`SaveData`), plus a separate memories document. Bump
  * SAVE_VERSION and add a step to `migrations.ts` whenever the shape changes.
  */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_KEY = 'cubeit.save';
 
 export interface Personality {

@@ -83,6 +83,10 @@
   lying down to sleep…) live in `character/pixel/stickman.ts`, a pure
   worklet that stamps a skeleton onto a 32×32 dot sprite each frame;
   `CharacterRig` only feeds it shared values and places the sprite.
+  The rest pose is the toy's 21-dot figure, dot for dot (a test pins it).
+  A hard sideways tilt makes that wall "down": `BodyState.rot` topples him
+  like a pole, he thuds flat, crumples head-first into the corner while the
+  tilt holds, and springs back up after.
   Knocks read through the whole body: the physics keeps a `recoil` spring
   (driven by every velocity change, kicked by wall hits) and a decaying
   `flail`, which the sprite spreads across hips, chest, head, arms and knees.

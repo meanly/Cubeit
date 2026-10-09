@@ -17,7 +17,16 @@ import { bool, int, isObj, num, numRecord, obj, oneOf, str, strArray, unique, ty
  * into version n+1. Version 1 is the first shipped shape, so the table is empty;
  * add steps here — never edit old ones.
  */
-const MIGRATIONS: Record<number, (doc: Obj) => Obj> = {};
+const MIGRATIONS: Record<number, (doc: Obj) => Obj> = {
+  // v2: the round rug is no longer laid out by default. Saves still on the old
+  // default lose it (it stays unlocked in Customize); a chosen striped rug stays.
+  1: (doc) => {
+    const room = obj(doc.room);
+    const items = obj(room.items);
+    if (items.rug === 'roundRug') return { ...doc, room: { ...room, items: { ...items, rug: null } } };
+    return doc;
+  },
+};
 
 export interface MigrationResult {
   data: SaveData;

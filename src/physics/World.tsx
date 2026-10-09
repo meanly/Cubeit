@@ -324,6 +324,9 @@ export function WorldProvider({ children }: { children: ReactNode }) {
             b.vx = 0;
             b.vz = 0;
             b.vy = 0;
+            b.fallen = 0;
+            b.rot = 0;
+            b.rotV = 0;
             b.hasTarget = 0;
             b.chase = 0;
             b.anchored = 0;

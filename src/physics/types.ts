@@ -34,6 +34,13 @@ export interface BodyState {
   /** > 0 while knocked over by a hard tilt (counts down to getting up); head toward fallDir. */
   fallen: number;
   fallDir: number;
+  /**
+   * Whole-body rotation in radians (+ = head toward +x) and its speed. Knocked
+   * over, he topples like a pole to π/2 (flat), past it head-first into the
+   * corner while the tilt keeps that wall "down", and springs back up after.
+   */
+  rot: number;
+  rotV: number;
   /** The screen is tipped over so far that gravity pulls toward its top edge. */
   gUp: number;
   /** Lying pressed against the ceiling. */
@@ -139,6 +146,8 @@ export function initialBody(x: number, z: number): BodyState {
     flail: 0,
     fallen: 0,
     fallDir: 1,
+    rot: 0,
+    rotV: 0,
     gUp: 0,
     onCeil: 0,
     hasTarget: 0,

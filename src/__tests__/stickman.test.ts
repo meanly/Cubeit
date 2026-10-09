@@ -24,11 +24,50 @@ function bounds(grid: number[]) {
   };
 }
 
+/** The toy's figure, dot for dot (center line between columns 8 and 9). */
+const REFERENCE = [
+  '........##........',
+  '.......####.......',
+  '.......####.......',
+  '.......####.......',
+  '........##........',
+  '......######......',
+  '.....########.....',
+  '.....#..##..#.....',
+  '....##..##..##....',
+  '....#...##...#....',
+  '...##...##...##...',
+  '........##........',
+  '.......####.......',
+  '......##..##......',
+  '......##..##......',
+  '.....##....##.....',
+  '.....##....##.....',
+  '.....##....##.....',
+  '.....##....##.....',
+  '.....##....##.....',
+  '....###....###....',
+];
+
 describe('pixel stickman', () => {
-  it('stands about 28 dots tall with its feet on the bottom row', () => {
+  it('matches the toy figure exactly at rest', () => {
+    const { grid } = rasterStickman(IDLE_INPUT);
+    const left = GRID / 2 - 9;
+    const rows: string[] = [];
+    for (let r = GRID - REFERENCE.length; r < GRID; r++) {
+      let line = '';
+      for (let c = left; c < left + 18; c++) line += grid[r * GRID + c] ? '#' : '.';
+      rows.push(line);
+    }
+    expect(rows).toEqual(REFERENCE);
+    // Nothing outside the reference box.
+    expect(cells(grid).length).toBe(REFERENCE.join('').split('#').length - 1);
+  });
+
+  it('stands 21 dots tall with its feet on the bottom row', () => {
     const b = bounds(rasterStickman(IDLE_INPUT).grid);
     expect(b.bottom).toBe(GRID - 1);
-    expect(b.h).toBeGreaterThanOrEqual(27);
+    expect(b.h).toBe(21);
     expect(b.h).toBeLessThanOrEqual(GRID);
   });
 
@@ -74,10 +113,10 @@ describe('pixel stickman', () => {
     expect(centroid(hit, GRID - 2, GRID - 1)).toBeCloseTo(centroid(rest, GRID - 2, GRID - 1), 0);
   });
 
-  it('flails after a hard knock: arms thrown up beside the head', () => {
+  it('flails after a hard knock: arms thrown up above the shoulders', () => {
     const top = Math.min(...cells(draw({}).grid).map(([, y]) => y));
-    // Lit dots level with the head but outside its 4 columns are hands.
-    const raised = (grid: number[]) => cells(grid).filter(([x, y]) => y <= top + 4 && (x < GRID / 2 - 2 || x > GRID / 2 + 1)).length;
+    // Lit dots above the shoulder bar but outside the collar are hands.
+    const raised = (grid: number[]) => cells(grid).filter(([x, y]) => y <= top + 5 && (x < GRID / 2 - 3 || x > GRID / 2 + 2)).length;
     expect(raised(draw({}).grid)).toBe(0);
     expect(raised(draw({ flail: 1 }).grid)).toBeGreaterThan(2);
   });
@@ -91,8 +130,23 @@ describe('pixel stickman', () => {
   it('lies down to sleep and when knocked over by a tilt', () => {
     const sleep = bounds(draw({ state: stateCode('sleeping') }).grid);
     expect(sleep.w).toBeGreaterThan(sleep.h);
-    const fallen = bounds(draw({ fallen: 1, fallDir: 1 }).grid);
+    const fallen = bounds(draw({ fallen: 1, fallDir: 1, rot: Math.PI / 2 }).grid);
     expect(fallen.w).toBeGreaterThan(fallen.h * 2);
+  });
+
+  it('topples through every angle, and lies head-down in a corner past flat', () => {
+    const headCol = (rot: number) => {
+      const { grid } = draw({ fallen: 1, fallDir: 1, rot, motion: 0.35 });
+      return bounds(grid);
+    };
+    // Tipping right: the figure leans further right and gets lower as it goes.
+    const steps = [0.2, 0.6, 1.0, Math.PI / 2].map(headCol);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i].right).toBeGreaterThanOrEqual(steps[i - 1].right);
+      expect(steps[i].h).toBeLessThan(steps[i - 1].h);
+    }
+    // Past flat (head jammed into the corner) it rises up off the floor again.
+    expect(headCol(Math.PI * 0.75).h).toBeGreaterThan(steps[3].h);
   });
 
   it('keeps its hands inside a nearby wall', () => {

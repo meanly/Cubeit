@@ -42,6 +42,17 @@ export const PHYS = {
   /** Impact speed above which the stickman is knocked off his feet and flails. */
   knockHop: 0.9,
   flailDecay: 1.5,
+  /** Toppling: angular pull while falling over (grows as he tips, like a pole), */
+  topple: 7,
+  toppleGrow: 16,
+  /** the springy get-up / settle, */
+  rotK: 70,
+  rotDamp: 13,
+  /** how far past flat he crumples head-first into the corner (radians), */
+  cornerTip: Math.PI / 4,
+  /** and the extra pull toward the wall a hard sideways tilt adds while he's down. */
+  sideGravity: 5,
+  lyingFriction: 1.1,
 } as const;
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -132,6 +143,9 @@ function stepHeld(b: BodyState, g: RoomGeometry, dt: number): void {
   b.speed = 0;
   b.walking = 0;
   b.fallen = 0;
+  // Picked up, he's righted at once.
+  b.rot = 0;
+  b.rotV = 0;
   b.onCeil = 0;
   b.lean += (clamp(-b.vx * 0.25, -0.35, 0.35) - b.lean) * Math.min(1, dt * 10);
 }
@@ -165,6 +179,53 @@ function stepRecoil(b: BodyState, dvx: number, kick: number, dt: number, reduceM
 function knock(b: BodyState, strength: number): void {
   'worklet';
   b.flail = Math.max(b.flail, clamp(strength, 0, 1));
+}
+
+/** Half the figure's width across the room at its current rotation. */
+export function bodyHalfX(rot: number): number {
+  'worklet';
+  return Math.max(WORLD.xMin, WORLD.lieHalf * Math.abs(Math.sin(rot)));
+}
+
+/**
+ * Whole-body rotation. Knocked over, he topples toward `target` like a pole
+ * (slow at first, faster as he tips), thuds and bounces when he lands, and
+ * springs back otherwise (settling out of the corner, getting up).
+ */
+function stepRot(b: BodyState, target: number, dt: number, now: number, events: number[], reduceMotion: number): void {
+  'worklet';
+  const err = target - b.rot;
+  const toppling = target !== 0 && Math.abs(target) > Math.abs(b.rot) + 0.01;
+  if (toppling) {
+    const dir = err > 0 ? 1 : -1;
+    const before = Math.abs(b.rot);
+    b.rotV += dir * (PHYS.topple + PHYS.toppleGrow * Math.abs(Math.sin(b.rot))) * dt;
+    b.rot += b.rotV * dt;
+    const impact = Math.abs(b.rotV);
+    const landed = (target - b.rot) * dir <= 0;
+    // Thud as his body slaps flat on the floor (or into the corner).
+    if ((landed || (before < Math.PI / 2 && Math.abs(b.rot) >= Math.PI / 2)) && impact > 2.5 && now - b.lastLandAt > 0.25) {
+      b.lastLandAt = now;
+      events.push(PhysicsEvent.Land, impact * 0.3, 0);
+      if (reduceMotion === 0) {
+        b.squashV += impact * 0.6;
+        knock(b, impact * 0.12);
+        b.recoilV += -dir * impact * 0.8;
+      }
+    }
+    if (landed) {
+      // Bounce a little off the floor / wall.
+      b.rot = target;
+      b.rotV = -b.rotV * 0.28;
+    }
+  } else {
+    b.rotV += (err * PHYS.rotK - b.rotV * PHYS.rotDamp) * dt;
+    b.rot += b.rotV * dt;
+    if (Math.abs(err) < 0.002 && Math.abs(b.rotV) < 0.05) {
+      b.rot = target;
+      b.rotV = 0;
+    }
+  }
 }
 
 export function stepBody(
@@ -232,6 +293,8 @@ export function stepBody(
       b.speed = 0;
       b.walking = 0;
       b.lean *= 1 - Math.min(1, dt * 6);
+      b.rot = 0;
+      b.rotV = 0;
       stepSquash(b, dt);
       stepRecoil(b, 0, 0, dt, p.reduceMotion);
       return;
@@ -244,6 +307,9 @@ export function stepBody(
   const airFactor = grounded ? 1 : 0.35;
   let ax = t.x * PHYS.tiltAccel * airFactor;
   let az = t.z * PHYS.tiltDepthAccel * airFactor;
+  // Knocked over by a hard sideways tilt, that wall becomes "down": he falls
+  // toward it rather than just sliding.
+  if (lying && p.tiltEnabled === 1 && Math.abs(t.x) > PHYS.fallOff) ax += t.x * PHYS.sideGravity;
 
   const steering = b.hasTarget === 1 || b.chase === 1;
   if (steering) {
@@ -262,7 +328,7 @@ export function stepBody(
     }
   }
   if (grounded && !steering) {
-    const f = Math.exp(-PHYS.friction * dt);
+    const f = Math.exp(-(lying ? PHYS.lyingFriction : PHYS.friction) * dt);
     b.vx *= f;
     b.vz *= f;
   }
@@ -316,9 +382,10 @@ export function stepBody(
   // Walls: soft bounce, and tell JS about hard bumps (rate-limited).
   let bumpSpeed = 0;
   let bumpSide = -1;
-  // Lying down, the stickman is much longer: his head reaches the wall sooner.
-  const xMin = lying ? WORLD.lieHalf : WORLD.xMin;
-  const xMax = lying ? 1 - WORLD.lieHalf : WORLD.xMax;
+  // Tipped over, the stickman is much wider: his head reaches the wall sooner.
+  const half = bodyHalfX(b.rot);
+  const xMin = half;
+  const xMax = 1 - half;
   if (b.x < xMin) {
     b.x = xMin;
     if (-b.vx > bumpSpeed) {
@@ -382,6 +449,22 @@ export function stepBody(
   if (b.walking === 1) b.walkPhase += b.speed * dt * 30;
   const leanTarget = b.walking === 1 ? clamp(b.vx * 0.3, -0.2, 0.2) : clamp(-t.x * 0.25, -0.3, 0.3);
   b.lean += (leanTarget - b.lean) * Math.min(1, dt * 8);
+
+  // Toppling over, crumpling head-first into the corner, getting back up.
+  let target = 0;
+  if (b.fallen > 0) {
+    const dir = b.fallDir >= 0 ? 1 : -1;
+    target = dir * (Math.PI / 2);
+    // Near the wall he's falling toward (a little slack so he doesn't flicker in and out).
+    const atWall = dir > 0 ? b.x >= xMax - 0.03 : b.x <= xMin + 0.03;
+    const hard = p.tiltEnabled === 1 && b.gUp === 0 ? clamp((Math.abs(t.x) - 0.6) / 0.35, 0, 1) : 0;
+    if (atWall && t.x * dir > 0) target += dir * PHYS.cornerTip * hard;
+  }
+  stepRot(b, target, dt, now, events, p.reduceMotion);
+  // Rotating can widen him past a wall: shove him back out.
+  const half2 = bodyHalfX(b.rot);
+  b.x = clamp(b.x, half2, 1 - half2);
+
   stepSquash(b, dt);
   stepRecoil(b, dvx, kick, dt, p.reduceMotion);
 }

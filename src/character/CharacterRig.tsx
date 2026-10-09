@@ -28,6 +28,7 @@ export type RigBody = Pick<
   | 'anchored'
   | 'fallen'
   | 'fallDir'
+  | 'rot'
 >;
 
 interface Props {
@@ -86,8 +87,10 @@ export const CharacterRig = memo(function CharacterRig({
       vy: b.vy,
       squash: b.squash,
       lean: b.lean,
-      fallen: b.fallen > 0 ? 1 : 0,
+      // Still drawn tipped while springing back up after the fall.
+      fallen: b.fallen > 0 || Math.abs(b.rot) > 0.05 ? 1 : 0,
       fallDir: b.fallDir,
+      rot: b.rot,
       roomL: (cx - g.L0) / g.dot,
       roomR: (g.R0 - cx) / g.dot,
       roomT: (feet - g.T0) / g.dot,
