@@ -57,8 +57,9 @@ idle or when the app goes to the background.
    - If the model's output can't be validated, the built-in parser tries; if the model errors, built-in replies answer and the chat says so.
 5. **No model** → the built-in parser (`intentParser.ts`, rule-based, not AI) handles planner requests; everything else gets the scripted replies.
 
-Every reply in the chat is labeled **On-device AI**, **Built-in parser**,
-**Simple reply** or **Built-in**, so a rule-based answer is never presented as
+Replies are labeled **On-device AI**, **Built-in parser** or **Built-in**;
+scripted replies carry no label (and the Talk header shows only an offline
+icon when no model is in use), so a rule-based answer is never presented as
 the model's.
 
 ## Voice input

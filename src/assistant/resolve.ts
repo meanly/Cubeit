@@ -1,5 +1,5 @@
 import { tokenize } from '../memory/recall';
-import { addDays, dayKey, diffDays, type DayKey, type Weekday } from '../planner/dates';
+import { addDays, dayKey, diffDays, formatDayInline, type DayKey, type Weekday } from '../planner/dates';
 import { PlannerError, validateEventDraft } from '../planner/ops';
 import { MOODS, type ChoreCategory, type HabitSchedule, type Mood, type PlannerData } from '../planner/types';
 import { parseRepeat, parseWeekdays, parseWhen, stripSpans, type ParsedWhen } from './dateParse';
@@ -283,7 +283,10 @@ export function resolveIntent(raw: RawIntent, ctx: ResolveContext, targetId?: st
       const picked = pickOne(matches, 'chore', query, raw, ctx, (c) => c.title);
       if ('res' in picked) return picked.res;
       const chore = picked.item;
-      if (raw.intent === 'complete_chore') return { kind: 'action', action: { type: 'completeChore', id: chore.id, title: chore.title, due: chore.due ?? null } };
+      if (raw.intent === 'complete_chore') {
+        if (chore.recurrence && chore.due && diffDays(today, chore.due) > 0) return reject(`“${chore.title}” isn’t due until ${formatDayInline(chore.due, today)}. You can check it off then.`);
+        return { kind: 'action', action: { type: 'completeChore', id: chore.id, title: chore.title, due: chore.due ?? null } };
+      }
       const parsed = raw.when ? parseWhen(raw.when, ctx.now, 'future') : null;
       const repeat = parseRepeat(`${raw.repeat ?? ''} ${raw.when ?? ''}`);
       const patch: { due?: DayKey; dueTime?: string; recurrence?: { every: number; unit: 'day' | 'week' | 'month' } } = {};

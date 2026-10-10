@@ -52,7 +52,7 @@ Target: iPhone 14 Plus and iPhone 14 Pro Max.
 - [ ] A wrong model answer never saves anything without tapping the confirm card.
 - [ ] Room animation stays smooth while the model is generating.
 - [ ] Backgrounding the app releases the model (no crash on return; next reply reloads it).
-- [ ] Delete model → Talk falls back to "Simple replies" / "Built-in parser" labels.
+- [ ] Delete model → Talk header shows only the offline icon; parser replies say "Built-in parser", scripted ones have no label.
 - [ ] Voice: permission prompts appear once; transcript appears for editing; cancel works; a 0.3 s tap says "too short"; recording files are gone afterwards.
 - [ ] Voice in Airplane Mode still transcribes (on-device), or clearly says on-device recognition isn't available.
 - [ ] Photo: camera and library both work; upright text from a rotated photo is read; Event / Checklist / Habit / Journal each show a confirm card.

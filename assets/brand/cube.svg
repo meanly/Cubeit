@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="727 219 560 560">
+  <!-- Cubeit app icon: the cube gadget with its little LCD screen (on the left face, in isometric perspective). -->
+  <defs>
+    <linearGradient id="cubeit-left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5B95CC"/>
+      <stop offset="1" stop-color="#4A82BC"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#1F4A73" stroke-width="10" stroke-linejoin="round">
+    <path d="M1007 228 1247 350 1007 470 768 350Z" fill="#93B8D8"/>
+    <path d="M768 350 1007 470 1007 770 768 648Z" fill="url(#cubeit-left)"/>
+    <path d="M1247 350 1007 470 1007 770 1247 648Z" fill="#2E5F86"/>
+  </g>
+  <path d="M792 352 1007 245 1223 352" fill="none" stroke="#B5D0E7" stroke-width="5" stroke-linejoin="round" opacity="0.8"/>
+  <g transform="translate(768 350) skewY(26.67)">
+    <rect x="30" y="34" width="182" height="228" rx="22" fill="#3E73A8" stroke="#1F4A73" stroke-width="9"/>
+    <rect x="45" y="47" width="152" height="202" rx="14" fill="#79A8D6"/>
+    <rect x="58" y="58" width="126" height="180" rx="10" fill="#BFCFD2" stroke="#1F4A73" stroke-width="4"/>
+    <path d="M88 78h12v6h-12zM82 84h24v6h-24zM82 90h24v6h-24zM88 96h12v6h-12zM114 112h13v6.5h-13zM114 118.5h19.5v6.5h-19.5zM94.5 125h6.5v6.5h-6.5zM114 125h13v6.5h-13zM94.5 131.5h6.5v6.5h-6.5zM107.5 131.5h26v6.5h-26zM94.5 138h26v6.5h-26zM127 138h6.5v6.5h-6.5zM114 144.5h6.5v6.5h-6.5zM133.5 144.5h6.5v6.5h-6.5zM114 151h6.5v6.5h-6.5zM140 151h6.5v6.5h-6.5zM114 157.5h6.5v6.5h-6.5zM140 157.5h6.5v6.5h-6.5zM114 164h13v6.5h-13zM107.5 170.5h6.5v6.5h-6.5zM127 170.5h6.5v6.5h-6.5zM107.5 177h6.5v6.5h-6.5zM127 177h6.5v6.5h-6.5zM101 183.5h13v6.5h-13zM133.5 183.5h6.5v6.5h-6.5zM101 190h6.5v6.5h-6.5zM133.5 190h6.5v6.5h-6.5zM101 196.5h6.5v6.5h-6.5zM133.5 196.5h6.5v6.5h-6.5zM101 203h6.5v6.5h-6.5zM133.5 203h13v6.5h-13zM94.5 209.5h13v6.5h-13z" fill="#1F4A73"/>
+  </g>
+</svg>

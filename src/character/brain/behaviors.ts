@@ -3,6 +3,7 @@ import type { CharacterAction } from '../../conversation/types';
 import { rememberedUserName } from '../../memory/recall';
 import { WORLD } from '../../physics/geometry';
 import { bondLevel, idleUnlocked } from '../../progression/progression';
+import { playItemFx } from '../../room/itemFx';
 import { itemAnchor } from '../../room/items/placement';
 import { skyPhase } from '../../room/items/pixelArt';
 import type { ActivityKind } from '../../state/schema';
@@ -442,7 +443,18 @@ export function reactSurprise(lines: readonly string[], state: CharacterState): 
   });
 }
 
-/** Walk over to a piece of furniture and use it. */
+/** Recent taps per item, for "again?!" reactions when the same thing is tapped over and over. */
+const itemTaps = new Map<ItemId, number[]>();
+
+/** How many times `item` was tapped in the last 20 s, counting this one. */
+function tapStreak(item: ItemId, now: number): number {
+  const recent = (itemTaps.get(item) ?? []).filter((t) => now - t < 20_000);
+  recent.push(now);
+  itemTaps.set(item, recent);
+  return recent.length;
+}
+
+/** Walk over to a piece of furniture and use it: every item has its own little routine. */
 export function reactToItem(slot: SlotId, item: ItemId, userInitiated: boolean): Behavior {
   return behavior('visitItem', async (ctx) => {
     const { brain } = ctx;
@@ -450,17 +462,31 @@ export function reactToItem(slot: SlotId, item: ItemId, userInitiated: boolean):
     const anchor = itemAnchor(slot, item);
     if (!def || !anchor) return;
     const game = useGame.getState();
+    const streak = userInitiated ? tapStreak(item, brain.env.now()) : 1;
+    const say = (lines: readonly string[], chance = 1, ms = 1500) => {
+      if (brain.env.rng() < chance) brain.say(pick(lines, brain.env.rng), ms);
+    };
 
     if (def.interaction === 'play') return chaseBall(4000, true).run(ctx);
 
-    if (def.interaction === 'toggleLight' && userInitiated) {
-      // The tap already flipped the lamp; the character just notices.
+    // Watered a moment ago: no more, thanks.
+    if (def.interaction === 'sniff' && streak >= 2) {
       brain.world.commands.stop();
-      brain.setState('curious');
-      brain.look(0.8, -0.3);
-      brain.say(pick(useGame.getState().room.lampOn ? LINES.lampOn : LINES.lampOff), 1600);
-      await ctx.wait(1500);
-      brain.look(0, 0);
+      brain.look(Math.sign(anchor.x - brain.world.body.value.x) * 0.6, 0);
+      brain.setState('surprised');
+      brain.emote('sweat', 1500);
+      say(LINES.overwatered);
+      await ctx.wait(1600);
+      brain.setState('idle');
+      return;
+    }
+    // Tapped again and again (the lamp has its own blinky reaction).
+    if (streak >= 4 && def.interaction !== 'toggleLight' && def.interaction !== 'rest') {
+      brain.world.commands.stop();
+      brain.setState('happy');
+      brain.emote('sweat', 1200);
+      say(LINES.again);
+      await ctx.wait(1400);
       brain.setState('idle');
       return;
     }
@@ -468,87 +494,170 @@ export function reactToItem(slot: SlotId, item: ItemId, userInitiated: boolean):
     if (def.interaction === 'rest') {
       if (!userInitiated && game.mood.energy < 0.45) return nap.run(ctx);
       brain.setState('walking');
-      await ctx.walkTo(anchor.x, anchor.z - 0.03, 0.3, WORLD.zMaxInteract);
+      if (!(await ctx.walkTo(anchor.x, anchor.z - 0.03, 0.3, WORLD.zMaxInteract))) await ctx.walkTo(anchor.x, anchor.z - 0.03, 0.34, WORLD.zMaxInteract);
       brain.world.commands.anchor(anchor.x, anchor.z, anchor.y);
-      brain.setState('happy');
       try {
-        await ctx.wait(2500);
+        playItemFx('poof');
+        if (item === 'bed' && userInitiated) {
+          // Jumping on the bed!
+          brain.setState('excited');
+          say(LINES.bounce, 0.8, 1400);
+          await ctx.wait(2400);
+          brain.setState('sitting');
+          await ctx.wait(900);
+        } else {
+          brain.setState('sitting');
+          if (item === 'cushion') brain.emote('heart', 1300);
+          say(LINES.comfy, 0.7);
+          await ctx.wait(2800);
+        }
       } finally {
         brain.world.commands.unanchor();
       }
+      brain.setState('idle');
       return;
     }
 
     brain.setState('walking');
-    await ctx.walkTo(anchor.x, anchor.z, 0.3, WORLD.zMaxInteract);
+    // Using an item only makes sense right next to it: keep going if the first walk fell short.
+    if (!(await ctx.walkTo(anchor.x, anchor.z, 0.3, WORLD.zMaxInteract))) await ctx.walkTo(anchor.x, anchor.z, 0.34, WORLD.zMaxInteract);
     brain.look(anchor.face * 0.5, anchor.lookY);
     const night = skyPhase(brain.env.hour()) === 'night';
     const level = bondLevel(game.progress.bondXp);
 
     switch (def.interaction) {
-      case 'toggleLight':
-        if (night && !game.room.lampOn) {
-          game.setLamp(true);
+      case 'toggleLight': {
+        // A tap flips the lamp; on his own he only switches it on when it's dark.
+        const lampOn = useGame.getState().room.lampOn;
+        const turnOn = userInitiated ? !lampOn : night && !lampOn;
+        if (!userInitiated && !turnOn) {
+          brain.setState('curious');
+          await ctx.wait(1400);
+          break;
+        }
+        brain.setState('reaching');
+        await ctx.wait(650);
+        brain.setState('tugging');
+        useGame.getState().setLamp(turnOn);
+        playItemFx(turnOn ? 'lampOn' : 'lampOff');
+        await ctx.wait(350);
+        if (streak >= 4) {
+          brain.setState('dizzy');
+          brain.emote('swirl', 1400);
+          say(LINES.blinky);
+          await ctx.wait(1600);
+          break;
+        }
+        brain.setState(turnOn ? 'happy' : 'idle');
+        if (turnOn) brain.emote('bulb', 1400);
+        say(turnOn ? LINES.lampOn : LINES.lampOff, 0.7);
+        await ctx.wait(1400);
+        break;
+      }
+      case 'sniff':
+        if (userInitiated || brain.env.rng() < 0.6) {
+          // Watering the sprout, which perks up with a little flower.
+          brain.setState('watering');
+          await ctx.wait(2600);
+          playItemFx('plantBloom');
           brain.setState('happy');
-          brain.say(pick(LINES.lampOn), 1600);
+          brain.emote('heart', 1400);
+          say(LINES.watered, 0.6);
+          await ctx.wait(1800);
+          logOnce('item', 'watered my little sprout');
         } else {
           brain.setState('interacting');
+          brain.emote('sparkle', 1500);
+          say(LINES.plant, 0.4);
+          await ctx.wait(2400);
+          logOnce('item', 'sniffed my little sprout');
         }
-        await ctx.wait(1600);
-        break;
-      case 'sniff':
-        brain.setState('interacting');
-        brain.emote('sparkle', 1500);
-        if (brain.env.rng() < 0.4) brain.say(pick(LINES.plant), 1500);
-        await ctx.wait(2400);
-        logOnce('item', 'sniffed my little sprout');
         break;
       case 'read':
-        brain.setState('thinking');
-        brain.emote('book', 3500);
+        brain.setState('reading');
+        brain.emote('book', 3000);
         await ctx.waitRange(3800, 5500);
-        if (brain.env.rng() < 0.4) brain.say(pick(LINES.book), 1500);
+        brain.setState('happy');
+        say(LINES.book, 0.5);
+        await ctx.wait(900);
         logOnce('item', 'read a book from my shelf');
         break;
       case 'lookOut':
-        if (night && idleUnlocked('stargaze', level)) {
-          brain.setState('love');
-          brain.emote('star', 2500);
-          brain.say(pick(LINES.stars), 2000);
-          logOnce('item', 'watched the stars from my window');
+        brain.setState('peeking');
+        if (night) {
+          playItemFx('shootingStar');
+          await ctx.wait(1300);
+          if (idleUnlocked('stargaze', level)) {
+            brain.setState('love');
+            brain.emote('star', 2500);
+            say(brain.env.rng() < 0.5 ? LINES.stars : LINES.shootingStar, 1, 2000);
+            logOnce('item', 'watched the stars from my window');
+          } else {
+            brain.setState('surprised');
+            say(LINES.shootingStar, 0.7);
+          }
+          await ctx.wait(1800);
         } else {
-          brain.setState('curious');
-          if (brain.env.rng() < 0.35) brain.say(pick(LINES.window), 1500);
+          playItemFx('bird');
+          await ctx.wait(1400);
+          brain.setState('happy');
+          say(brain.env.rng() < 0.6 ? LINES.bird : LINES.window, 0.7);
+          await ctx.wait(1500);
           logOnce('item', 'looked out the window');
         }
-        await ctx.wait(2800);
         break;
       case 'admire':
-        brain.setState(item === 'photoFrame' ? 'love' : 'curious');
-        brain.emote(item === 'photoFrame' ? 'heart' : 'sparkle', 1800);
-        if (item === 'photoFrame') brain.say(pick(LINES.frame), 1500);
-        await ctx.wait(2200);
+        if (item === 'photoFrame') {
+          brain.setState('love');
+          playItemFx('hearts');
+          brain.emote('heart', 1800);
+          say(LINES.frame);
+          await ctx.wait(2400);
+        } else {
+          brain.setState('pointing');
+          playItemFx('posterStars');
+          await ctx.wait(2200);
+          brain.setState('happy');
+          brain.emote('star', 1200);
+          say(LINES.poster, 0.5);
+          await ctx.wait(900);
+        }
         break;
       case 'checkTime': {
+        brain.setState('checkingWatch');
+        await ctx.wait(1100);
+        brain.setState('surprised');
+        brain.look(0, -1);
+        playItemFx('clockRing');
         const d = new Date();
-        brain.setState('curious');
         brain.say(clockLine(d.getHours(), d.getMinutes()), 1800);
-        await ctx.wait(2200);
+        await ctx.wait(1900);
         break;
       }
       case 'showFinds':
-        brain.setState('happy');
+        brain.setState('presenting');
+        playItemFx('findsSparkle');
         brain.emote('sparkle', 1500);
-        brain.say(pick(LINES.finds), 1500);
+        say(LINES.finds);
         await ctx.wait(2200);
         break;
-      case 'swing':
       case 'twinkle':
-        brain.setState('curious');
-        await ctx.wait(900);
+        brain.setState('clapping');
+        playItemFx('lightsChase');
+        say(LINES.lights, 0.6);
+        await ctx.wait(2200);
+        brain.setState('happy');
+        await ctx.wait(600);
+        break;
+      case 'swing':
+        brain.setState('reaching');
+        brain.world.commands.hop(1.3);
+        await ctx.wait(500);
+        playItemFx('mobileStars');
         brain.setState('happy');
         brain.emote('sparkle', 1200);
-        await ctx.wait(1200);
+        say(LINES.mobile, 0.6);
+        await ctx.wait(1400);
         break;
       default:
         brain.setState('interacting');

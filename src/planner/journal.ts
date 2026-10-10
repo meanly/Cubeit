@@ -10,6 +10,14 @@ export const MOOD_LABEL: Record<Mood, string> = {
   rough: 'Rough',
 };
 
+export const MOOD_EMOJI: Record<Mood, string> = {
+  great: '😄',
+  good: '🙂',
+  okay: '😐',
+  low: '😕',
+  rough: '😣',
+};
+
 /** Guided prompts for the journal; one is suggested per day. */
 export const JOURNAL_PROMPTS = [
   'What made you smile today?',
@@ -84,7 +92,10 @@ export function summarizeJournal(entries: readonly JournalEntry[], from: DayKey,
     if (e.mood) moods[e.mood] = (moods[e.mood] ?? 0) + 1;
     for (const w of new Set(tokenize(e.text))) if (w.length > 3) words.set(w, (words.get(w) ?? 0) + 1);
   }
-  const topMood = (Object.entries(moods).sort((a, b) => b[1] - a[1])[0]?.[0] as Mood | undefined) ?? null;
+  // Only a mood on more than half of the mood-tagged entries counts as "mostly"; a tie is mixed.
+  const moodTotal = Object.values(moods).reduce((sum, n) => sum + n, 0);
+  const [best, bestCount] = Object.entries(moods).sort((a, b) => b[1] - a[1])[0] ?? [];
+  const topMood = best && bestCount! * 2 > moodTotal ? (best as Mood) : null;
   const themes = [...words.entries()]
     .filter(([, n]) => n >= 2)
     .sort((a, b) => b[1] - a[1])
@@ -95,8 +106,11 @@ export function summarizeJournal(entries: readonly JournalEntry[], from: DayKey,
 
 export function describeSummary(s: JournalSummary, label: string): string {
   if (s.count === 0) return `No journal entries ${label}.`;
-  const parts = [`${s.count} entr${s.count === 1 ? 'y' : 'ies'} on ${s.days} day${s.days === 1 ? '' : 's'} ${label}`];
-  if (s.topMood) parts.push(`mostly feeling ${MOOD_LABEL[s.topMood].toLowerCase()}`);
+  const entries = `${s.count} entr${s.count === 1 ? 'y' : 'ies'}`;
+  const parts = [s.days === s.count ? `${entries} ${label}` : `${entries} on ${s.days} day${s.days === 1 ? '' : 's'} ${label}`];
+  const moodTotal = Object.values(s.moods).reduce((sum, n) => sum + n, 0);
+  if (s.topMood) parts.push(`${moodTotal === 1 ? 'feeling' : 'mostly feeling'} ${MOOD_LABEL[s.topMood].toLowerCase()}`);
+  else if (moodTotal > 1) parts.push('a mix of moods');
   if (s.themes.length > 0) parts.push(`words that came up: ${s.themes.join(', ')}`);
   return `${parts.join(' · ')}.`;
 }

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
@@ -68,10 +69,7 @@ export function GameHud() {
         <Card>
           <Text style={styles.title}>{info.title}</Text>
           <Text style={styles.body}>{info.how(name, tilt)}</Text>
-          <View style={styles.actions}>
-            <Button label="Not now" tone="secondary" onPress={exit} style={styles.flex} />
-            <Button label="Start" icon="play" onPress={() => s.actions?.start()} style={styles.flex} />
-          </View>
+          <Actions secondary={{ label: 'Not now', onPress: exit }} primary={{ label: 'Start', onPress: () => s.actions?.start() }} />
         </Card>
       )}
 
@@ -79,10 +77,7 @@ export function GameHud() {
         <Card>
           <Text style={styles.title}>Paused</Text>
           <Text style={styles.body}>Take your time. Quitting won’t cost anything.</Text>
-          <View style={styles.actions}>
-            <Button label="Quit" tone="secondary" onPress={exit} style={styles.flex} />
-            <Button label="Resume" icon="play" onPress={() => s.actions?.resume()} style={styles.flex} />
-          </View>
+          <Actions secondary={{ label: 'Quit', onPress: exit }} primary={{ label: 'Resume', onPress: () => s.actions?.resume() }} />
         </Card>
       )}
 
@@ -100,12 +95,28 @@ export function GameHud() {
             <Text style={styles.body}>You earned</Text>
             <StarCount value={s.result.starsEarned} size={16} />
           </View>
-          <View style={styles.actions}>
-            <Button label="Done" tone="secondary" onPress={exit} style={styles.flex} />
-            <Button label="Play again" icon="refresh" onPress={() => s.actions?.start()} style={styles.flex} />
-          </View>
+          <Actions secondary={{ label: 'Done', onPress: exit }} primary={{ label: 'Play again', onPress: () => s.actions?.start() }} />
         </Card>
       )}
+    </View>
+  );
+}
+
+/** Below this width two buttons can't sit side by side without clipping their labels. */
+const STACK_BELOW = 200;
+
+/**
+ * The card's two buttons. The card lives inside the LCD, which is small on
+ * most phones, so they're compact and stack (main action on top) when narrow.
+ */
+function Actions({ secondary, primary }: { secondary: { label: string; onPress: () => void }; primary: { label: string; onPress: () => void } }) {
+  const styles = useStyles(makeStyles);
+  const [width, setWidth] = useState(0);
+  const stacked = width > 0 && width < STACK_BELOW;
+  return (
+    <View style={[styles.actions, stacked && styles.actionsStacked]} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <Button compact label={secondary.label} tone="secondary" onPress={secondary.onPress} style={[styles.action, !stacked && styles.flex]} />
+      <Button compact label={primary.label} onPress={primary.onPress} style={[styles.action, !stacked && styles.flex]} />
     </View>
   );
 }
@@ -146,16 +157,19 @@ const makeStyles = (colors: Colors) =>
     backgroundColor: colors.ink,
   },
   messageText: { fontFamily: fonts.bold, fontSize: 15, color: colors.onInk },
-  cardWrap: { ...StyleSheet.absoluteFill, justifyContent: 'center', padding: 22 },
+  cardWrap: { ...StyleSheet.absoluteFill, justifyContent: 'center', padding: 10 },
   card: {
     backgroundColor: colors.paper,
     borderRadius: radii.xl,
-    padding: 18,
-    gap: 10,
+    padding: 16,
+    gap: 8,
   },
-  title: { fontFamily: fonts.bold, fontSize: 21, color: colors.text },
-  body: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.textDim },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  title: { fontFamily: fonts.bold, fontSize: 19, color: colors.text },
+  body: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.textDim },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  // Stacked: the main action goes on top.
+  actionsStacked: { flexDirection: 'column-reverse' },
+  action: { paddingHorizontal: 12 },
   scoreRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   score: { fontFamily: fonts.black, fontSize: 44, color: colors.star },
   outOf: { fontFamily: fonts.bold, fontSize: 20, color: colors.textDim },

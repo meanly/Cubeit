@@ -17,8 +17,7 @@ import { confirm } from '../../ui/Confirm';
 import { Button, Chip, PressableScale, type IconName } from '../../ui/primitives';
 import { EmptyState, PanelHeader } from '../PanelHost';
 import { useColors, useStyles, type Colors } from '../../theme/theme';
-import type { Open } from './rows';
-import { Group, LinkRow, Muted } from './ui';
+import { Group, Muted } from '../planner/ui';
 
 type Filter = 'all' | 'mine' | 'favorite' | 'moments';
 
@@ -34,13 +33,12 @@ const TYPE_ICON: Record<MemoryType, IconName> = {
 
 const formatDate = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-/** Saved long-term memories (only ever ones the user approved or wrote), plus the character's finds and profile. */
-export function MemoryList({ open }: { open: Open }) {
+/** Saved long-term memories (only ever ones the user approved or wrote). */
+export function MemoryList({ onOpen }: { onOpen: (m: Memory) => void }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const items = useMemories((s) => s.items);
   const name = useGame((s) => s.character.name);
-  const found = useGame((s) => s.progress.finds.length);
   const [filter, setFilter] = useState<Filter>('all');
   const shown = useMemo(() => {
     const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
@@ -58,10 +56,6 @@ export function MemoryList({ open }: { open: Open }) {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
-      <Group>
-        <LinkRow icon="heart-outline" title={`About ${name}`} detail="Friendship, personality, little habits" onPress={() => open({ name: 'about' })} />
-        <LinkRow icon="gift-outline" title="Finds" detail={`${found}/${FINDS.length} treasures found`} onPress={() => open({ name: 'finds' })} />
-      </Group>
       {items.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.filters}>
           <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
@@ -83,12 +77,14 @@ export function MemoryList({ open }: { open: Open }) {
       ) : (
         <Group>
           {shown.map((m) => (
-            <PressableScale key={m.id} accessibilityRole="button" accessibilityHint="Opens the memory to edit or delete" onPress={() => open({ name: 'memory', memory: m })} style={styles.memory}>
+            <PressableScale key={m.id} accessibilityRole="button" accessibilityHint="Opens the memory to edit or delete" onPress={() => onOpen(m)} style={styles.memory}>
               <View style={styles.memoryIcon}>
                 <Ionicons name={TYPE_ICON[m.type]} size={18} color={colors.accent} />
               </View>
               <View style={styles.flex}>
-                <Text style={styles.memoryText}>{m.content}</Text>
+                <Text style={styles.memoryText} numberOfLines={3}>
+                  {m.content}
+                </Text>
                 <Text style={styles.memoryMeta}>
                   {MEMORY_TYPE_LABELS[m.type]} · {formatDate(m.createdAt)}
                   {m.importance >= 3 ? ' · ★ important' : ''}
@@ -219,7 +215,7 @@ export function FindsGrid() {
                 <Ellipse cx={20} cy={22} rx={14} ry={13} fill={has ? f.color : colors.surfacePressed} />
                 {has && <Ellipse cx={15} cy={16} rx={5} ry={3.5} fill={f.accent} opacity={0.9} />}
               </Svg>
-              <Text style={styles.findName} numberOfLines={1}>
+              <Text style={styles.findName} numberOfLines={2}>
                 {has ? f.name : '???'}
               </Text>
               {has && (
@@ -250,7 +246,7 @@ export function About() {
         ? 'Star Catch'
         : 'Peekaboo';
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
+    <View style={styles.aboutWrap}>
       <View style={styles.aboutCard}>
         <Text style={styles.aboutName}>{character.name}</Text>
         <Text style={styles.aboutMeta}>
@@ -282,7 +278,7 @@ export function About() {
           </View>
         ))}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -337,8 +333,9 @@ const makeStyles = (colors: Colors) =>
     borderRadius: radii.md,
     backgroundColor: colors.surface,
   },
-  findName: { fontFamily: fonts.bold, fontSize: 12, color: colors.text },
+  findName: { fontFamily: fonts.bold, fontSize: 12, color: colors.text, textAlign: 'center' },
   findBlurb: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 14, color: colors.textFaint, textAlign: 'center' },
+  aboutWrap: { gap: 10 },
   aboutCard: { padding: 14, borderRadius: radii.lg, backgroundColor: colors.surface, gap: 8 },
   aboutName: { fontFamily: fonts.black, fontSize: 22, color: colors.text },
   aboutMeta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textDim },

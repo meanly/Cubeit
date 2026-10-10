@@ -19,6 +19,7 @@ import { useGame } from '../state/gameStore';
 import { useCharacterView, useUi } from '../state/uiStore';
 import { BallView } from './BallView';
 import { BumpFx } from './BumpFx';
+import { ItemFx } from './ItemFxLayer';
 import { pointInRect, slotRect } from './items/placement';
 import { LcdBackdrop, LcdNight } from './LcdScreen';
 import { RoomItems } from './RoomItems';
@@ -100,7 +101,7 @@ export function Room({ width, height, children, overlay }: Props) {
         if (!item) continue;
         if (pointInRect(x, y, slotRect(g, slot), 4)) {
           pokes[slot].set((v) => v + 1);
-          if (item === 'lamp') useGame.getState().setLamp(!roomNow.lampOn);
+          // (The stickman walks over and pulls the lamp's chain himself; see reactToItem.)
           feedback('tap');
           emit({ type: 'itemTapped', slot, item });
           return;
@@ -160,6 +161,7 @@ export function Room({ width, height, children, overlay }: Props) {
           />
           <BallView ball={world.ball} body={world.body} geo={world.geo} dot={g.dot} layer="front" />
           <BumpFx world={world} g={g} />
+          <ItemFx g={g} reduceMotion={reduceMotion} />
           {children}
           <LcdNight hour={hour} lampLit={room.lampOn && room.items.corner === 'lamp'} />
           <LcdGlass size={width} />

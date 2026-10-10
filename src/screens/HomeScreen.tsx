@@ -20,6 +20,7 @@ import { useGame } from '../state/gameStore';
 import { useUi } from '../state/uiStore';
 
 import { Backdrop } from '../ui/Backdrop';
+import { ConfirmHost } from '../ui/Confirm';
 import { Toasts } from '../ui/Toasts';
 import { ActionBar, ACTION_BAR_HEIGHT } from './ActionBar';
 import { Header, HEADER_HEIGHT } from './Header';
@@ -33,6 +34,11 @@ const SIDE = 16;
 const SCREEN_SCALE = 0.86;
 /** Space between the device and the stat cards. */
 const GROUP_GAP = 40;
+/** On short screens the gap shrinks down to this to keep the LCD at least MIN_ROOM wide. */
+const MIN_GROUP_GAP = 12;
+const MIN_ROOM = 150;
+/** The stat cards and tiles need about this much width for their labels. */
+const MIN_CARDS_W = 280;
 /** Space kept between the device and an open sheet. */
 const SHEET_GAP = 24;
 
@@ -65,14 +71,19 @@ function HomeContent() {
   const chromeW = (HOUSING + BEZEL) * 2;
   const chromeH = BEZEL * 2 + HOUSING + CHIN;
   const fitW = (root.w - SIDE * 2 - chromeW) * SCREEN_SCALE;
-  const fitH = regionH - HOME_CARDS_HEIGHT - GROUP_GAP - chromeH;
+  // Short screens give up some of the gap under the device before the screen gets too small.
+  const roomyH = regionH - HOME_CARDS_HEIGHT - GROUP_GAP - chromeH;
+  const gap = roomyH >= MIN_ROOM ? GROUP_GAP : Math.max(MIN_GROUP_GAP, GROUP_GAP - (MIN_ROOM - roomyH));
+  const fitH = regionH - HOME_CARDS_HEIGHT - gap - chromeH;
   const fit = Math.max(0, Math.min(fitW, fitH, 560));
   const roomW = (Math.floor((fit * px) / LCD_DOTS) * LCD_DOTS) / px;
   const roomH = roomW;
   const { width: frameW, height: frameH } = deviceSize(roomW);
-  const groupH = frameH + GROUP_GAP + HOME_CARDS_HEIGHT;
+  const groupH = frameH + gap + HOME_CARDS_HEIGHT;
   const roomTop = regionTop + Math.max(0, (regionH - groupH) / 2);
-  const cardsTop = roomTop + frameH + GROUP_GAP;
+  const cardsTop = roomTop + frameH + gap;
+  // As wide as the device, unless a short screen shrank it too far for the cards' labels.
+  const cardsW = Math.min(root.w - SIDE * 2, Math.max(frameW, MIN_CARDS_W));
 
   // The open panel's top edge: the device slides up, then scales down, to stay above it.
   const panelTop = useSharedValue(10_000);
@@ -112,10 +123,11 @@ function HomeContent() {
       )}
       {ready && (
         <View style={[styles.cards, { top: cardsTop }]} pointerEvents="box-none">
-          <HomeCards width={frameW} disabled={busy} />
+          <HomeCards width={cardsW} disabled={busy} />
         </View>
       )}
-      {ready && (
+      {/* Sheets don't depend on the room's size, so the nav always opens something. */}
+      {root.w > 0 && (
         <PanelHost
           panels={PANELS}
           rootHeight={root.h}
@@ -129,6 +141,8 @@ function HomeContent() {
         <ActionBar disabled={busy} />
       </View>
       <Toasts top={insets.top + HEADER_HEIGHT + 6} />
+      {/* Confirm dialogs asked from the room or any sheet (Settings hosts its own). */}
+      <ConfirmHost scope="home" />
       <SettingsScreen />
       {!onboarded && <Onboarding />}
     </View>

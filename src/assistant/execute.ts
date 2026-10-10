@@ -1,6 +1,6 @@
 import { highlights, searchMemories } from '../memory/recall';
 import type { Memory } from '../memory/types';
-import { dayKey, diffDays, formatDay, formatTime, type DayKey } from '../planner/dates';
+import { dayKey, diffDays, formatDay, formatDayInline, formatTime, type DayKey } from '../planner/dates';
 import { encouragement, habitStats, scheduleLabel } from '../planner/habits';
 import { MOOD_LABEL, searchJournal } from '../planner/journal';
 import { eventsBetween } from '../planner/ops';
@@ -62,7 +62,7 @@ export function describeAction(a: AssistantAction, today: DayKey): { heading: st
         heading: 'New chore',
         lines: [
           a.title,
-          [a.due ? `Due ${formatDay(a.due, today).toLowerCase()}${a.dueTime ? ` at ${formatTime(a.dueTime)}` : ''}` : 'No due date', a.recurrence ? recurrenceLabel(a.recurrence) : null]
+          [a.due ? `Due ${formatDayInline(a.due, today)}${a.dueTime ? ` at ${formatTime(a.dueTime)}` : ''}` : 'No due date', a.recurrence ? recurrenceLabel(a.recurrence) : null]
             .filter(Boolean)
             .join(' · '),
           ...(a.checklist.length ? [a.checklist.map((s) => `☐ ${s}`).join('\n')] : []),
@@ -72,11 +72,11 @@ export function describeAction(a: AssistantAction, today: DayKey): { heading: st
       };
     case 'updateChore': {
       const p = a.patch;
-      const bits = [p.due ? `due ${formatDay(p.due, today).toLowerCase()}` : null, p.dueTime ? formatTime(p.dueTime) : null, p.recurrence ? recurrenceLabel(p.recurrence).toLowerCase() : null].filter(Boolean);
+      const bits = [p.due ? `due ${formatDayInline(p.due, today)}` : null, p.dueTime ? formatTime(p.dueTime) : null, p.recurrence ? recurrenceLabel(p.recurrence).toLowerCase() : null].filter(Boolean);
       return { heading: 'Change chore', lines: [a.title, bits.join(' · ')], confirmLabel: 'Save change' };
     }
     case 'completeChore':
-      return { heading: 'Finish chore', lines: [a.title, a.due ? `Due ${formatDay(a.due, today).toLowerCase()}` : ''].filter(Boolean), confirmLabel: 'Mark done' };
+      return { heading: 'Finish chore', lines: [a.title, a.due ? `Due ${formatDayInline(a.due, today)}` : ''].filter(Boolean), confirmLabel: 'Mark done' };
     case 'createJournal':
       return {
         heading: 'Journal entry',
@@ -119,7 +119,7 @@ export function executeAction(a: AssistantAction, ctx: { data: () => PlannerData
       }
       case 'listEvents': {
         const events = eventsBetween(ctx.data().events, a.from, a.to);
-        const label = a.label || (a.from === a.to ? formatDay(a.from, today).toLowerCase() : 'then');
+        const label = a.label || (a.from === a.to ? formatDayInline(a.from, today) : 'then');
         if (events.length === 0) return { ok: true, text: `Nothing on your calendar ${label}.` };
         const items = events.map((e) => ({ id: e.id, title: e.title + (e.doneAt ? ' ✓' : ''), detail: eventWhen(e, today) }));
         const head =
@@ -138,7 +138,7 @@ export function executeAction(a: AssistantAction, ctx: { data: () => PlannerData
         const habit = data.habits.find((h) => h.id === a.id);
         if (!habit) return { ok: false, text: 'That habit no longer exists.' };
         const stats = habitStats(habit, data.habitLogs, today);
-        return { ok: true, text: added ? encouragement(habit, stats) : `“${habit.title}” was already done ${formatDay(a.day, today).toLowerCase()}.` };
+        return { ok: true, text: added ? encouragement(habit, stats) : `“${habit.title}” was already done ${formatDayInline(a.day, today)}.` };
       }
       case 'habitProgress': {
         const data = ctx.data();
@@ -157,18 +157,18 @@ export function executeAction(a: AssistantAction, ctx: { data: () => PlannerData
       }
       case 'createChore': {
         const c = service.createChore({ title: a.title, due: a.due, dueTime: a.dueTime, recurrence: a.recurrence, checklist: a.checklist, category: a.category, reminder: a.reminder });
-        const when = c.due ? ` (due ${formatDay(c.due, today).toLowerCase()})` : '';
+        const when = c.due ? ` (due ${formatDayInline(c.due, today)})` : '';
         return { ok: true, text: `Added the chore “${c.title}”${when}${c.recurrence ? `, ${recurrenceLabel(c.recurrence).toLowerCase()}` : ''}.` };
       }
       case 'updateChore': {
         const c = service.editChore(a.id, a.patch);
-        return { ok: true, text: `Updated “${c.title}”${c.due ? ` — due ${formatDay(c.due, today).toLowerCase()}` : ''}${c.recurrence ? `, ${recurrenceLabel(c.recurrence).toLowerCase()}` : ''}.` };
+        return { ok: true, text: `Updated “${c.title}”${c.due ? ` — due ${formatDayInline(c.due, today)}` : ''}${c.recurrence ? `, ${recurrenceLabel(c.recurrence).toLowerCase()}` : ''}.` };
       }
       case 'completeChore': {
         const done = service.finishChore(a.id, a.due);
         if (!done) return { ok: true, text: `“${a.title}” was already finished.` };
         const next = ctx.data().chores.find((c) => c.id === a.id);
-        return { ok: true, text: next?.recurrence && next.due ? `Nice work! Next time: ${formatDay(next.due, today).toLowerCase()}.` : `Nice work — “${a.title}” is done!` };
+        return { ok: true, text: next?.recurrence && next.due ? `Nice work! Next time: ${formatDayInline(next.due, today)}.` : `Nice work — “${a.title}” is done!` };
       }
       case 'listChores': {
         const data = ctx.data();
@@ -191,7 +191,7 @@ export function executeAction(a: AssistantAction, ctx: { data: () => PlannerData
         const items = open.slice(0, 10).map((c) => ({
           id: c.id,
           title: c.title,
-          detail: c.due ? `${choreStatus(c, today) === 'overdue' ? 'Overdue · ' : ''}due ${formatDay(c.due, today).toLowerCase()}` : 'No due date',
+          detail: c.due ? `${choreStatus(c, today) === 'overdue' ? 'Overdue · ' : ''}due ${formatDayInline(c.due, today)}` : 'No due date',
         }));
         return { ok: true, text: `${open.length} chore${open.length === 1 ? '' : 's'} ${label}:`, items };
       }

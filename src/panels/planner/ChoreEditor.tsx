@@ -33,7 +33,8 @@ export function ChoreEditor({ chore, initial, onDone }: { chore?: Chore; initial
   const [title, setTitle] = useState(chore?.title ?? initial?.title ?? '');
   const [notes, setNotes] = useState(chore?.notes ?? '');
   const [category, setCategory] = useState<ChoreCategory>(chore?.category ?? 'other');
-  const [due, setDue] = useState<DayKey | null>(chore?.due ?? null);
+  // New chores start on today; clear the date for an "anytime" chore.
+  const [due, setDue] = useState<DayKey | null>(chore ? (chore.due ?? null) : today);
   const [dueTime, setDueTime] = useState<TimeOfDay | null>(chore?.dueTime ?? null);
   const [timeValid, setTimeValid] = useState(true);
   const [unit, setUnit] = useState<RepeatUnit>(chore?.recurrence?.unit ?? 'none');

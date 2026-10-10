@@ -1,4 +1,4 @@
-import { formatDay, formatTime, minutesOf, toTimestamp, dayKey, type Weekday } from './dates';
+import { formatDay, formatDayInline, formatTime, minutesOf, toTimestamp, dayKey, type Weekday } from './dates';
 import type { PlannerData } from './types';
 
 export type ReminderTrigger =
@@ -45,7 +45,7 @@ export function computeReminders(data: PlannerData, now: number, characterName: 
     dated.push({
       id: `${REMINDER_PREFIX}chore.${c.id}.${c.due}`,
       title: c.title,
-      body: c.dueTime ? `Chore due ${formatDay(c.due, today)} at ${formatTime(c.dueTime)}` : `Chore due ${formatDay(c.due, today).toLowerCase()}`,
+      body: c.dueTime ? `Chore due ${formatDayInline(c.due, today)} at ${formatTime(c.dueTime)}` : `Chore due ${formatDayInline(c.due, today)}`,
       trigger: { kind: 'date', at },
     });
   }

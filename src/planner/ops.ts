@@ -1,5 +1,5 @@
-import { diffDays, isDayKey, isTimeOfDay, minutesOf, type DayKey, type TimeOfDay, type Weekday } from './dates';
-import { nextOccurrence } from './recurrence';
+import { diffDays, formatDayInline, isDayKey, isTimeOfDay, minutesOf, type DayKey, type TimeOfDay, type Weekday } from './dates';
+import { canUndoCompletion, nextOccurrence } from './recurrence';
 import {
   LIMITS,
   type CalendarEvent,
@@ -372,13 +372,16 @@ export function toggleChecklistItem(data: PlannerData, id: string, itemId: strin
  * Complete the chore's current occurrence. `expectedDue` must match the open
  * occurrence (so a double tap or a stale screen can't complete the next one);
  * a recurring chore moves on to its next occurrence with a fresh checklist.
+ * A recurring chore's occurrence due after `today` can't be finished yet (so
+ * ticking it twice can't skip ahead); a one-off chore can be done early.
  */
-export function completeChore(data: PlannerData, id: string, expectedDue: DayKey | null, now: number) {
+export function completeChore(data: PlannerData, id: string, expectedDue: DayKey | null, today: DayKey, now: number) {
   const chore = data.chores.find((c) => c.id === id);
   if (!chore) throw new PlannerError('That chore no longer exists.');
   if ((chore.due ?? null) !== expectedDue || (chore.completedAt && !chore.recurrence)) {
     return { data, completed: false, chore };
   }
+  if (chore.recurrence && chore.due && diffDays(today, chore.due) > 0) throw new PlannerError(`“${chore.title}” isn’t due until ${formatDayInline(chore.due, today)}. You can check it off then.`);
   const record = { choreId: id, title: chore.title, due: chore.due ?? null, at: now };
   const choreHistory = [...data.choreHistory, record].slice(-LIMITS.choreHistory);
   let next: Chore;
@@ -395,16 +398,35 @@ export function completeChore(data: PlannerData, id: string, expectedDue: DayKey
   return { data: { ...data, chores: data.chores.map((c) => (c.id === id ? next : c)), choreHistory }, completed: true, chore: next };
 }
 
-/** Reopen a finished one-off chore. (Recurring occurrences are history; the series stays open.) */
-export function reopenChore(data: PlannerData, id: string, now: number): PlannerData {
+/**
+ * Undo the finished occurrence logged at `at`: a one-off chore reopens, a
+ * recurring one steps back to that occurrence. Only the chore's latest
+ * completion can be undone, and only while the series hasn't moved on since.
+ */
+export function undoChoreCompletion(data: PlannerData, id: string, at: number, now: number): PlannerData {
+  const chore = data.chores.find((c) => c.id === id);
+  const record = data.choreHistory.find((h) => h.choreId === id && h.at === at);
+  if (!chore || !record || !canUndoCompletion(chore, data.choreHistory, record)) throw new PlannerError('That one can’t be undone anymore.');
+  const next: Chore = { ...chore, updatedAt: now };
+  if (chore.recurrence && record.due) next.due = record.due;
+  else delete next.completedAt;
   return {
     ...data,
-    chores: data.chores.map((c) => {
-      if (c.id !== id || !c.completedAt) return c;
-      const copy = { ...c, updatedAt: now };
-      delete copy.completedAt;
-      return copy;
-    }),
+    chores: data.chores.map((c) => (c.id === id ? next : c)),
+    choreHistory: data.choreHistory.filter((h) => h !== record),
+  };
+}
+
+/** Reopen a finished one-off chore (dropping its completion from history). */
+export function reopenChore(data: PlannerData, id: string, now: number): PlannerData {
+  const chore = data.chores.find((c) => c.id === id);
+  if (!chore?.completedAt) return data;
+  const copy = { ...chore, updatedAt: now };
+  delete copy.completedAt;
+  return {
+    ...data,
+    chores: data.chores.map((c) => (c.id === id ? copy : c)),
+    choreHistory: data.choreHistory.filter((h) => !(h.choreId === id && h.at === chore.completedAt)),
   };
 }
 

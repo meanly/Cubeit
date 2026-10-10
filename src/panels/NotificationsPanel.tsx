@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { ActivityKind } from '../state/schema';
 import { useGame } from '../state/gameStore';
+import { useUi } from '../state/uiStore';
 import { fonts, radii } from '../theme/tokens';
 import type { IconId } from '../ui/Icons';
 import { IconBadge } from '../ui/primitives';
@@ -38,6 +39,11 @@ export function NotificationsPanel() {
   // What was unread when the sheet opened stays highlighted while it's open.
   const [seenAt] = useState(() => useGame.getState().progress.notificationsSeenAt);
   const [now] = useState(() => Date.now());
+  // Opened from the Friend sheet's Activity row: Back returns there.
+  const [cameFrom] = useState(() => {
+    const prev = useUi.getState().previousPanel;
+    return prev === 'notifications' ? 'none' : prev;
+  });
   useEffect(() => {
     useGame.getState().markNotificationsSeen();
   }, [activities.length]);
@@ -45,7 +51,7 @@ export function NotificationsPanel() {
   const items = [...activities].reverse();
   return (
     <View style={styles.flex}>
-      <PanelHeader title="Notifications" />
+      <PanelHeader title="Activity" onBack={cameFrom !== 'none' ? () => void useUi.getState().openPanel(cameFrom) : undefined} />
       {items.length === 0 ? (
         <EmptyState icon="notifications-outline" title="All quiet" body={`When ${name} naps, plays or finds something, you'll see it here.`} />
       ) : (

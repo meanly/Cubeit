@@ -35,7 +35,8 @@ export function itemAnchor(slot: SlotId, item: ItemId): ItemAnchor | null {
       // Lying on top of the rest item, which stands on the bottom edge.
       return { x: 15 / LCD_DOTS, z: 0.02, y: (REST_DOTS[item] ?? 4) / LCD_DOTS, lookY: 0, face: 0 };
     case 'corner':
-      return { x: 0.66, z: 0.1, y: 0, lookY: item === 'lamp' ? -0.6 : 0, face: 1 };
+      // Close enough to the lamp to reach its pull chain.
+      return { x: item === 'lamp' ? 0.7 : 0.66, z: 0.1, y: 0, lookY: item === 'lamp' ? -0.6 : 0, face: 1 };
     case 'wallLeft':
       return { x: 0.23, z: 0.3, y: 0, lookY: -1, face: 0 };
     case 'wallRight':

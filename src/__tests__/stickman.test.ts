@@ -1,4 +1,5 @@
 import { accessoryCode, GRID, IDLE_INPUT, rasterStickman, stateCode, type StickmanInput } from '../character/pixel/stickman';
+import { EXPRESSIONS, type CharacterState } from '../character/states';
 
 const draw = (over: Partial<StickmanInput>) => rasterStickman({ ...IDLE_INPUT, motion: 1, ...over });
 
@@ -186,4 +187,88 @@ describe('pixel stickman', () => {
     const { grid } = draw({ accessory: accessoryCode('crown') });
     expect(cells(grid, 2).length).toBe(10);
   });
+
+  it('stays in one piece through hard jumps, knocks, walls, spins and every state', () => {
+    // Regressions: shrugging shoulders lifted the shoulder bar off the spine; limbs
+    // past a wall were erased (cutting a hand off at the elbow); a jolt while lying
+    // down pushed the head off the neck; turned figures could round apart at a joint.
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const states = Object.keys(EXPRESSIONS) as CharacterState[];
+    for (let i = 0; i < 4000; i++) {
+      const st = states[Math.floor(rnd() * states.length)];
+      if (st === 'hidden') continue;
+      const turn = rnd();
+      const { grid } = draw({
+        t: rnd() * 20,
+        seed: Math.floor(rnd() * 5),
+        state: stateCode(st),
+        motion: rnd() < 0.85 ? 1 : 0.35,
+        walking: st === 'walking' ? 1 : 0,
+        walkPhase: rnd() * 7,
+        facing: rnd() < 0.5 ? -1 : 1,
+        air: rnd() < 0.5 ? 1 : 0,
+        vy: (rnd() - 0.5) * 8,
+        squash: -0.35 + rnd() * 0.8,
+        recoil: (rnd() - 0.5) * 2.8,
+        flail: rnd() < 0.5 ? rnd() : 0,
+        lean: (rnd() - 0.5) * 0.8,
+        armL: (rnd() - 0.3) * 3,
+        armR: (rnd() - 0.3) * 3,
+        bounce: rnd(),
+        sway: rnd() < 0.3 ? rnd() : 0,
+        lower: rnd() < 0.3 ? rnd() : 0,
+        lookX: (rnd() - 0.5) * 2,
+        spin: rnd() < 0.2 ? rnd() : 0,
+        rot: turn < 0.5 ? 0 : turn < 0.65 ? Math.PI / 2 : turn < 0.8 ? -Math.PI / 2 : turn < 0.9 ? Math.PI : (rnd() - 0.5) * 7,
+        roomL: rnd() < 0.3 ? 3 + rnd() * 6 : 99,
+        roomR: rnd() < 0.3 ? 3 + rnd() * 6 : 99,
+        roomT: rnd() < 0.3 ? 16 + rnd() * 10 : 99,
+      });
+      const n = pieces(grid);
+      // Watering also drips loose drops from the spout.
+      if (st !== 'watering') expect({ st, i, n }).toEqual({ st, i, n: 1 });
+    }
+  });
+
+  it('holds its props and stays in one piece using room items', () => {
+    for (const st of ['watering', 'reading', 'reaching', 'tugging', 'peeking', 'pointing', 'checkingWatch', 'clapping', 'presenting', 'sitting'] as const)
+      for (const t of [0, 0.4, 1.1]) {
+        // Watering also drips two loose drops from the spout.
+        const n = pieces(draw({ t, state: stateCode(st) }).grid);
+        expect({ st, t, n: st === 'watering' && n <= 3 ? 1 : n }).toEqual({ st, t, n: 1 });
+      }
+    // The can and the book add dots beyond the bare figure.
+    const bare = cells(draw({}).grid).length;
+    expect(cells(draw({ state: stateCode('watering') }).grid).length).toBeGreaterThan(bare + 10);
+    expect(draw({ state: stateCode('reading') }).grid.join('')).not.toBe(draw({ state: stateCode('idle') }).grid.join(''));
+  });
 });
+
+/** How many 8-connected groups of body dots the frame has (1 = nothing floating loose). */
+function pieces(grid: number[]): number {
+  const seen = new Array<boolean>(grid.length).fill(false);
+  let n = 0;
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] !== 1 || seen[i]) continue;
+    n++;
+    const stack = [i];
+    seen[i] = true;
+    while (stack.length) {
+      const j = stack.pop()!;
+      const c = j % GRID;
+      const r = Math.floor(j / GRID);
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          const cc = c + dc;
+          const rr = r + dr;
+          const k = rr * GRID + cc;
+          if (cc >= 0 && rr >= 0 && cc < GRID && rr < GRID && grid[k] === 1 && !seen[k]) {
+            seen[k] = true;
+            stack.push(k);
+          }
+        }
+    }
+  }
+  return n;
+}

@@ -4,7 +4,7 @@ import type { Appearance } from '../content/appearance';
 import type { RoomConfig, GameId } from './schema';
 import type { CharacterState, EmoteId } from '../character/states';
 
-export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'planner' | 'nearby' | 'notifications';
+export type PanelId = 'none' | 'talk' | 'play' | 'customize' | 'planner' | 'nearby' | 'notifications' | 'friend';
 
 export interface Toast {
   id: number;
@@ -28,8 +28,17 @@ export interface VisitorInfo {
 
 interface UiStore {
   panel: PanelId;
-  openPanel(panel: PanelId): void;
-  closePanel(): void;
+  /** The sheet that was open before this one, so a Back button can return there. */
+  previousPanel: PanelId;
+  /** Opens a sheet ('none' closes). Resolves false when an editor's leave guard kept the current one open. */
+  openPanel(panel: PanelId): Promise<boolean>;
+  closePanel(): Promise<boolean>;
+  /**
+   * Set by an editor while it holds unsaved work; asked (e.g. "Discard your
+   * changes?") before the open sheet is closed or swapped for another.
+   */
+  leaveGuard: (() => Promise<boolean>) | null;
+  setLeaveGuard(guard: (() => Promise<boolean>) | null): void;
 
   settingsOpen: boolean;
   setSettingsOpen(open: boolean): void;
@@ -52,16 +61,29 @@ interface UiStore {
   setStorageProblem(problem: string | null): void;
 
   /** Which Planner tab is showing (kept while the sheet is closed, so links can open a tab). */
-  plannerTab: 'today' | 'calendar' | 'habits' | 'chores' | 'journal';
+  plannerTab: 'calendar' | 'journal' | 'habits' | 'chores';
   setPlannerTab(tab: UiStore['plannerTab']): void;
 }
 
 let toastId = 1;
 
-export const useUi = create<UiStore>()((set) => ({
+export const useUi = create<UiStore>()((set, get) => {
+  const go = async (panel: PanelId) => {
+    const { panel: current, leaveGuard } = get();
+    if (panel === current) return true;
+    if (leaveGuard && !(await leaveGuard())) return false;
+    // Something else may have moved the sheet while the question was open.
+    if (get().panel !== current) return false;
+    set({ panel, previousPanel: current, leaveGuard: null });
+    return true;
+  };
+  return {
   panel: 'none',
-  openPanel: (panel) => set({ panel }),
-  closePanel: () => set({ panel: 'none' }),
+  previousPanel: 'none',
+  openPanel: go,
+  closePanel: () => go('none'),
+  leaveGuard: null,
+  setLeaveGuard: (leaveGuard) => set({ leaveGuard }),
 
   settingsOpen: false,
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
@@ -86,9 +108,10 @@ export const useUi = create<UiStore>()((set) => ({
   storageProblem: null,
   setStorageProblem: (storageProblem) => set({ storageProblem }),
 
-  plannerTab: 'today',
+  plannerTab: 'calendar',
   setPlannerTab: (plannerTab) => set({ plannerTab }),
-}));
+  };
+});
 
 /** What the character is doing right now — drives the face and overlays. */
 interface CharacterViewStore {

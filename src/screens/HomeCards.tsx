@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -46,8 +47,17 @@ export function HomeCards({ width, disabled }: { width: number; disabled?: boole
           </View>
         </View>
 
-        <View style={styles.stat} accessibilityLabel={`Friendship level ${bond.level}${maxed ? ', maxed' : `, ${bond.toNext} XP to the next level`}`}>
-          <Text style={styles.caption}>FRIENDSHIP</Text>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`Friendship level ${bond.level}${maxed ? ', maxed' : `, ${bond.toNext} XP to the next level`}`}
+          accessibilityHint="Opens your friend's profile, memories and finds"
+          onPress={() => openPanel('friend')}
+          style={styles.stat}
+        >
+          <View style={styles.captionRow}>
+            <Text style={styles.caption}>FRIENDSHIP</Text>
+            <Ionicons name="chevron-forward" size={11} color={colors.textFaint} />
+          </View>
           <View style={styles.valueRow}>
             <AppSymbol name="heart" size={16} color={colors.brand} />
             <Text style={styles.value}>
@@ -58,7 +68,7 @@ export function HomeCards({ width, disabled }: { width: number; disabled?: boole
               <View style={[styles.fill, { width: `${Math.round(Math.min(1, Math.max(0, bond.fraction)) * 100)}%` }]} />
             </View>
           </View>
-        </View>
+        </PressableScale>
       </View>
 
       <Text style={styles.section} accessibilityRole="header">
@@ -89,6 +99,7 @@ const makeStyles = (colors: Colors) =>
   disabled: { opacity: 0.45 },
   stats: { flexDirection: 'row', gap: 10, height: STATS_H },
   stat: { flex: 1, borderRadius: radii.md, backgroundColor: colors.paper, paddingHorizontal: 14, justifyContent: 'center', gap: 4 },
+  captionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   caption: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 0.8, color: colors.textFaint },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   value: { fontFamily: fonts.black, fontSize: 20, lineHeight: 24, color: colors.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },

@@ -34,7 +34,8 @@ interface Selection {
 
 /**
  * Edit a draft of the room and character. The room above previews the draft
- * live; nothing is saved until "Apply". Closing the panel discards the draft.
+ * live; nothing is saved until "Apply" (or until buying the last locked pick,
+ * which puts the preview on). Closing the panel discards an unapplied draft.
  */
 export function CustomizePanel() {
   const colors = useColors();
@@ -84,11 +85,19 @@ export function CustomizePanel() {
   const locked = selections.filter((s) => !unlocked(s));
   const dirty = JSON.stringify({ room, look }) !== JSON.stringify({ room: savedRoom, look: savedLook });
 
-  const apply = () => {
+  const save = () => {
     useGame.getState().applyCustomization(room, look);
-    feedback('success');
     emit({ type: 'customizeApplied' });
-    useUi.getState().closePanel();
+  };
+  const apply = () => {
+    save();
+    feedback('success');
+    void useUi.getState().closePanel();
+  };
+  // Paying for something is a clear "I want this": once nothing in the preview is
+  // locked any more, put it on right away (the sheet stays open to keep browsing).
+  const bought = () => {
+    if (locked.length === 1) save();
   };
 
   const restoreDefaults = async () => {
@@ -161,7 +170,7 @@ export function CustomizePanel() {
       </ScrollView>
       <View style={styles.footer}>
         {locked.length > 0 ? (
-          <UnlockBar selection={locked[0]} stars={progress.stars} />
+          <UnlockBar selection={locked[0]} stars={progress.stars} onBought={bought} />
         ) : (
           <View style={styles.footerRow}>
             <Button label="Restore defaults" tone="ghost" compact onPress={() => void restoreDefaults()} />
@@ -173,7 +182,7 @@ export function CustomizePanel() {
   );
 }
 
-function UnlockBar({ selection, stars }: { selection: Selection; stars: number }) {
+function UnlockBar({ selection, stars, onBought }: { selection: Selection; stars: number; onBought: () => void }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const { unlock } = selection;
@@ -189,7 +198,9 @@ function UnlockBar({ selection, stars }: { selection: Selection; stars: number }
           icon="star"
           label={`Unlock · ${unlock.cost}`}
           disabled={!affordable}
-          onPress={() => buy(unlockKey(selection.kind, selection.id), unlock.cost)}
+          onPress={() => {
+            if (buy(unlockKey(selection.kind, selection.id), unlock.cost)) onBought();
+          }}
         />
       </View>
     );

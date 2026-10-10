@@ -24,6 +24,11 @@ export function NearbyPanel() {
   const [phase, setPhase] = useState<Phase>('intro');
   const [peer, setPeer] = useState<NearbyPeer | null>(null);
   const stop = useRef<(() => void) | null>(null);
+  // Where this sheet was opened from, fixed at open (Home's Friends tile has nothing to go back to).
+  const [cameFrom] = useState(() => {
+    const prev = useUi.getState().previousPanel;
+    return prev === 'nearby' ? 'none' : prev;
+  });
 
   useEffect(() => () => stop.current?.(), []);
 
@@ -53,7 +58,8 @@ export function NearbyPanel() {
 
   return (
     <View style={styles.flex}>
-      <PanelHeader title="Nearby friends" onBack={() => useUi.getState().openPanel('play')} />
+      {/* Back only when there's somewhere to go back to (it can be opened from Play or from Home). */}
+      <PanelHeader title="Nearby friends" onBack={cameFrom !== 'none' ? () => void useUi.getState().openPanel(cameFrom) : undefined} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.badge}>
           <Ionicons name="flask-outline" size={13} color={colors.warning} />

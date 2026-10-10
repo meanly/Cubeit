@@ -12,18 +12,23 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.cubeit.companion",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "Cubeit turns your voice messages into text using on-device speech recognition. Audio never leaves this phone.",
+        "NSMicrophoneUsageDescription": "Cubeit uses the microphone only while you record a voice message. It's turned into text on this phone and the recording is deleted."
       }
     },
     "android": {
       "package": "app.cubeit.companion",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#EAEBE6",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -73,6 +78,12 @@
           "enableOpenCLAndHexagon": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b38f9ae7-2aae-47d3-9d5b-f8a1662b0ec0"
+      }
+    },
+    "owner": "meanly"
   }
 }

@@ -151,6 +151,15 @@ export function formatDay(day: DayKey, today: DayKey, opts: { relative?: boolean
   return d.getFullYear() === dayDate(today).getFullYear() ? base : `${base}, ${d.getFullYear()}`;
 }
 
+/**
+ * `formatDay` for use mid-sentence ("was due yesterday", "due Thu, Oct 8"):
+ * only the relative words are lowercased, never weekday or month names.
+ */
+export function formatDayInline(day: DayKey, today: DayKey): string {
+  const text = formatDay(day, today);
+  return text === 'Today' || text === 'Tomorrow' || text === 'Yesterday' ? text.toLowerCase() : text;
+}
+
 export function formatMonth(day: DayKey): string {
   const d = dayDate(day);
   return `${MONTH_LONG[d.getMonth()]} ${d.getFullYear()}`;

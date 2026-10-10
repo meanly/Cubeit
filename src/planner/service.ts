@@ -149,11 +149,11 @@ export function toggleChoreItem(id: string, itemId: string): void {
   commitPlanner((d) => ({ data: ops.toggleChecklistItem(d, id, itemId, now), result: null }));
 }
 
-/** Finish the chore's open occurrence (`due` must match it). Returns false if it was already finished. */
+/** Finish the chore's open occurrence (`due` must match it). Returns false if it was already finished; throws if it isn't due yet. */
 export function finishChore(id: string, due: DayKey | null): boolean {
   const now = Date.now();
   const { completed, claimed, title } = commitPlanner((d) => {
-    const r = ops.completeChore(d, id, due, now);
+    const r = ops.completeChore(d, id, due, today(), now);
     if (!r.completed) return { data: d, result: { completed: false, claimed: false, title: r.chore.title } };
     const c = ops.claimReward(r.data, `chore:${id}:${due ?? 'once'}`);
     return { data: c.data, result: { completed: true, claimed: c.claimed, title: r.chore.title } };
@@ -165,6 +165,12 @@ export function finishChore(id: string, due: DayKey | null): boolean {
 export function reopenChore(id: string): void {
   const now = Date.now();
   commitPlanner((d) => ({ data: ops.reopenChore(d, id, now), result: null }));
+}
+
+/** Undo the completion logged at `at` (see `ops.undoChoreCompletion`). Stars already paid stay paid, and finishing it again pays nothing. */
+export function undoChore(id: string, at: number): void {
+  const now = Date.now();
+  commitPlanner((d) => ({ data: ops.undoChoreCompletion(d, id, at, now), result: null }));
 }
 
 // ───────────────────────── journal ─────────────────────────

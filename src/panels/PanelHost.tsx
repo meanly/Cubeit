@@ -29,6 +29,7 @@ const PANEL_HEIGHT: Record<OpenPanel, number> = {
   planner: 0.72,
   nearby: 0.5,
   notifications: 0.55,
+  friend: 0.62,
 };
 
 /** Pull the sheet down this far (or flick it) and it closes. */
@@ -122,7 +123,7 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
   useEffect(() => {
     if (panel === 'none') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      closePanel();
+      void closePanel();
       return true;
     });
     return () => sub.remove();
@@ -153,9 +154,16 @@ export function PanelHost({ panels, rootHeight, topReserve, bottomInset, panelTo
     };
   });
 
+  // A drag that lets go past the threshold asks to close; if an editor keeps it open, settle back up.
+  const dragClose = () => {
+    void closePanel().then((closed) => {
+      if (!closed) drag.set(withSpring(0, { damping: 18, stiffness: 220 }));
+    });
+  };
+
   const Content = shown !== 'none' ? panels[shown] : null;
   return (
-    <SheetDragContext.Provider value={{ offset: drag, close: closePanel }}>
+    <SheetDragContext.Provider value={{ offset: drag, close: dragClose }}>
       <Animated.View style={[styles.sheet, style]} pointerEvents={panel === 'none' ? 'none' : 'box-none'}>
         <SheetHandle />
         {Content && <Content />}
@@ -188,13 +196,13 @@ export function PanelHeader({ title, right, onBack }: { title: string; right?: R
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {onBack && <IconButton icon="chevron-back" label="Back" onPress={onBack} color={colors.text} />}
-          <Text style={styles.title} accessibilityRole="header">
+          <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
             {title}
           </Text>
         </View>
         <View style={styles.headerRight}>
           {right}
-          <IconButton icon="close" label="Close" onPress={closePanel} />
+          <IconButton icon="close" label="Close" onPress={() => void closePanel()} />
         </View>
       </View>
     </GestureDetector>
@@ -247,9 +255,10 @@ const makeStyles = (colors: Colors) =>
     paddingRight: 16,
     height: 52,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, letterSpacing: -0.3 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
+  // The buttons keep their size; a long title (e.g. "Talk with <long name>") truncates instead.
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 },
+  title: { fontFamily: fonts.bold, fontSize: 20, color: colors.text, letterSpacing: -0.3, flexShrink: 1 },
   empty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, gap: 8 },
   emptyIcon: {
     width: 54,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { minutesOf, type DayKey, type TimeOfDay } from '../../planner/dates';
+import { formatDay, minutesOf, type DayKey, type TimeOfDay } from '../../planner/dates';
 import { useToday } from '../../planner/hooks';
 import * as service from '../../planner/service';
 import type { CalendarEvent } from '../../planner/types';
@@ -55,7 +55,10 @@ export function EventEditor({ event, day, onDone }: { event?: CalendarEvent; day
       reminderMin: reminder ?? undefined,
     };
     const ok = run(() => (event ? service.editEvent(event.id, draft) : service.createEvent(draft)));
-    if (ok) onDone();
+    if (!ok) return;
+    // The list you return to may not show that day, so say where it went (only after it's saved).
+    if (!event) notice(`Added “${title.trim()}” · ${formatDay(date, today)}`);
+    onDone();
   };
 
   const remove = async () => {

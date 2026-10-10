@@ -86,7 +86,9 @@ export function Button({
       ]}
     >
       {icon && <Ionicons name={icon} size={compact ? 16 : 18} color={fg} />}
-      <Text style={[styles.buttonLabel, compact && styles.buttonLabelCompact, { color: fg }]}>{label}</Text>
+      <Text style={[styles.buttonLabel, compact && styles.buttonLabelCompact, { color: fg }]} numberOfLines={1}>
+        {label}
+      </Text>
     </PressableScale>
   );
 }
@@ -246,7 +248,7 @@ const makeStyles = (colors: Colors) =>
     gap: 8,
   },
   buttonCompact: { minHeight: 40, paddingHorizontal: 16, borderRadius: radii.sm + 2 },
-  buttonLabel: { fontFamily: fonts.bold, fontSize: 15 },
+  buttonLabel: { fontFamily: fonts.bold, fontSize: 15, flexShrink: 1 },
   buttonLabelCompact: { fontSize: 14 },
   iconButton: {
     width: 32,

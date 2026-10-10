@@ -230,16 +230,17 @@ const PLANT = [
 function drawLamp(b: Bitmap, { lampOn }: ItemDrawProps) {
   b.sprite(['...######...', '..#oooooo#..', '..#oooooo#..', '.#oooooooo#.', '.#oooooooo#.', '############'], 0, 1);
   b.fill(5, 7, 2, 17).sprite(['...######...', '..########..'], 0, 24);
+  // The pull chain and its bead (the stickman tugs it to switch the lamp).
+  b.set(2, 7).set(2, 8).fill(2, 9, 2, 2);
   if (lampOn) {
     b.dither(2, 2, 8, 4, 0);
     b.fill(4, 7, 4, 1);
     // Light rays fanning out under the shade.
     for (const [x, y] of [
-      [2, 9],
-      [1, 11],
+      [0, 9],
+      [0, 12],
       [9, 9],
       [10, 11],
-      [3, 9],
       [8, 9],
     ])
       b.set(x, y);

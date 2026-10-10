@@ -19,7 +19,18 @@ export type CharacterState =
   | 'sliding'
   | 'waving'
   | 'love'
-  | 'hidden';
+  | 'hidden'
+  // Using things in the room (each has its own animation, some with a prop in hand):
+  | 'watering'
+  | 'reading'
+  | 'reaching'
+  | 'tugging'
+  | 'peeking'
+  | 'pointing'
+  | 'checkingWatch'
+  | 'clapping'
+  | 'presenting'
+  | 'sitting';
 
 export type EyeShape = 'open' | 'happy' | 'closed' | 'wide' | 'sad' | 'sparkle' | 'dizzy' | 'focus' | 'sleepy' | 'look-up';
 export type MouthShape = 'smile' | 'grin' | 'open' | 'o' | 'flat' | 'frown' | 'wavy' | 'cat';
@@ -52,6 +63,16 @@ export const EXPRESSIONS: Record<CharacterState, Expression> = {
   waving: { eyes: 'happy', mouth: 'grin', blush: 0.6 },
   love: { eyes: 'happy', mouth: 'cat', blush: 1 },
   hidden: { eyes: 'open', mouth: 'smile', blush: 0.3 },
+  watering: { eyes: 'focus', mouth: 'smile', blush: 0.4 },
+  reading: { eyes: 'focus', mouth: 'cat', blush: 0.3 },
+  reaching: { eyes: 'look-up', mouth: 'o', blush: 0.3 },
+  tugging: { eyes: 'focus', mouth: 'flat', blush: 0.4 },
+  peeking: { eyes: 'look-up', mouth: 'o', blush: 0.3 },
+  pointing: { eyes: 'sparkle', mouth: 'grin', blush: 0.5 },
+  checkingWatch: { eyes: 'focus', mouth: 'flat', blush: 0.25 },
+  clapping: { eyes: 'happy', mouth: 'open', blush: 0.8 },
+  presenting: { eyes: 'happy', mouth: 'grin', blush: 0.7 },
+  sitting: { eyes: 'happy', mouth: 'smile', blush: 0.5 },
 };
 
 /** Shapes that are already "closed" shouldn't blink. */
@@ -59,7 +80,7 @@ export const canBlink = (shape: EyeShape) =>
   shape === 'open' || shape === 'wide' || shape === 'sparkle' || shape === 'look-up' || shape === 'focus' || shape === 'sad';
 
 /** Little symbols that pop above the character's head. */
-export type EmoteId = 'heart' | 'note' | 'question' | 'exclaim' | 'zzz' | 'sparkle' | 'dots' | 'star' | 'swirl' | 'book';
+export type EmoteId = 'heart' | 'note' | 'question' | 'exclaim' | 'zzz' | 'sparkle' | 'dots' | 'star' | 'swirl' | 'book' | 'drop' | 'bulb' | 'sweat';
 
 /**
  * Pose targets the rig animates toward for each state. Arms are "raise"
@@ -99,4 +120,15 @@ export const POSES: Record<CharacterState, Pose> = {
   waving: { ...BASE, armR: 2.4 },
   love: { ...BASE, armL: 0.8, armR: 0.8, bounce: 0.3 },
   hidden: BASE,
+  // The item states pose the hands themselves (in the sprite); these only set the mood of the body.
+  watering: BASE,
+  reading: { ...BASE, tilt: -0.05 },
+  reaching: BASE,
+  tugging: BASE,
+  peeking: BASE,
+  pointing: { ...BASE, tilt: 0.1 },
+  checkingWatch: BASE,
+  clapping: { ...BASE, bounce: 0.35 },
+  presenting: { ...BASE, bounce: 0.25 },
+  sitting: BASE,
 };

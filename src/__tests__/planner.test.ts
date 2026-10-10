@@ -1,9 +1,9 @@
 import { addDays, addMonths, diffDays, formatTime, isDayKey, isTimeOfDay, monthGrid, startOfWeek, weekdayOf } from '../planner/dates';
 import { encouragement, habitStats } from '../planner/habits';
-import { searchJournal, summarizeJournal } from '../planner/journal';
+import { describeSummary, searchJournal, summarizeJournal } from '../planner/journal';
 import * as ops from '../planner/ops';
 import { emptyPlannerDoc, migratePlanner } from '../planner/plannerDoc';
-import { choreStatus, nextOccurrence, upcomingOccurrences } from '../planner/recurrence';
+import { canUndoCompletion, choreStatus, nextOccurrence, upcomingOccurrences } from '../planner/recurrence';
 import { computeReminders, planReminderSync, reminderSignature } from '../planner/reminders';
 import { HABIT_TEMPLATES, templateDraft, templateTaken } from '../planner/templates';
 import type { PlannerData } from '../planner/types';
@@ -175,7 +175,7 @@ describe('chores and recurrence', () => {
     let data = ops.toggleChecklistItem(add.data, add.chore.id, add.chore.checklist[0].id, NOW);
     expect(choreStatus(data.chores[0], TODAY)).toBe('overdue');
 
-    const done = ops.completeChore(data, add.chore.id, '2026-10-03', NOW);
+    const done = ops.completeChore(data, add.chore.id, '2026-10-03', TODAY, NOW);
     expect(done.completed).toBe(true);
     data = done.data;
     expect(data.chores).toHaveLength(1);
@@ -185,7 +185,7 @@ describe('chores and recurrence', () => {
     expect(data.choreHistory).toEqual([expect.objectContaining({ choreId: add.chore.id, due: '2026-10-03' })]);
 
     // A stale second tap for the old occurrence does nothing — it can't complete the next one.
-    const stale = ops.completeChore(data, add.chore.id, '2026-10-03', NOW);
+    const stale = ops.completeChore(data, add.chore.id, '2026-10-03', TODAY, NOW);
     expect(stale.completed).toBe(false);
     expect(stale.data.chores[0].due).toBe('2026-10-10');
   });
@@ -202,12 +202,39 @@ describe('chores and recurrence', () => {
 
   it('one-off chores complete once and can be reopened', () => {
     const add = ops.addChore(fresh(), { title: 'Return parcel' }, TODAY, NOW);
-    const done = ops.completeChore(add.data, add.chore.id, null, NOW);
+    const done = ops.completeChore(add.data, add.chore.id, null, TODAY, NOW);
     expect(done.completed).toBe(true);
     expect(choreStatus(done.data.chores[0], TODAY)).toBe('done');
-    expect(ops.completeChore(done.data, add.chore.id, null, NOW).completed).toBe(false);
+    expect(ops.completeChore(done.data, add.chore.id, null, TODAY, NOW).completed).toBe(false);
     const reopened = ops.reopenChore(done.data, add.chore.id, NOW);
     expect(choreStatus(reopened.chores[0], TODAY)).toBe('someday');
+    expect(reopened.choreHistory).toEqual([]);
+  });
+
+  it('a one-off chore due later can be finished early', () => {
+    const add = ops.addChore(fresh(), { title: 'Return library books', due: '2026-10-13' }, TODAY, NOW);
+    const done = ops.completeChore(add.data, add.chore.id, '2026-10-13', TODAY, NOW);
+    expect(done.completed).toBe(true);
+    expect(choreStatus(done.data.chores[0], TODAY)).toBe('done');
+  });
+
+  it('a recurring chore’s next occurrence can’t be finished early', () => {
+    const add = ops.addChore(fresh(), { title: 'Water plants', recurrence: { every: 1, unit: 'day' } }, TODAY, NOW);
+    const done = ops.completeChore(add.data, add.chore.id, TODAY, TODAY, NOW);
+    expect(done.chore.due).toBe('2026-10-11');
+    expect(() => ops.completeChore(done.data, add.chore.id, '2026-10-11', TODAY, NOW)).toThrow(ops.PlannerError);
+    expect(ops.completeChore(done.data, add.chore.id, '2026-10-11', '2026-10-11', NOW).completed).toBe(true);
+  });
+
+  it('undoing the latest completion steps a recurring chore back to that occurrence', () => {
+    const add = ops.addChore(fresh(), { title: 'Dishes', recurrence: { every: 1, unit: 'day' } }, TODAY, NOW);
+    const done = ops.completeChore(add.data, add.chore.id, TODAY, TODAY, NOW);
+    const record = done.data.choreHistory[0];
+    expect(canUndoCompletion(done.data.chores[0], done.data.choreHistory, record)).toBe(true);
+    const undone = ops.undoChoreCompletion(done.data, add.chore.id, record.at, NOW);
+    expect(undone.chores[0].due).toBe(TODAY);
+    expect(undone.choreHistory).toEqual([]);
+    expect(() => ops.undoChoreCompletion(undone, add.chore.id, record.at, NOW)).toThrow(ops.PlannerError);
   });
 });
 
@@ -232,6 +259,17 @@ describe('journal', () => {
     const s = summarizeJournal(withEntries().journal, '2026-10-04', TODAY);
     expect(s).toMatchObject({ count: 2, days: 2 });
     expect(s.moods).toEqual({ good: 1, low: 1 });
+    // One of each isn't "mostly" anything.
+    expect(s.topMood).toBeNull();
+    expect(describeSummary(s, 'this week')).toBe('2 entries this week · a mix of moods.');
+  });
+
+  it('calls a mood "mostly" only when it is on most entries', () => {
+    let d = withEntries();
+    d = ops.addJournal(d, { day: '2026-10-09', text: 'Better evening.', mood: 'good' }, NOW).data;
+    const s = summarizeJournal(d.journal, '2026-10-04', TODAY);
+    expect(s.topMood).toBe('good');
+    expect(describeSummary(s, 'this week')).toBe('3 entries on 2 days this week · mostly feeling good.');
   });
 
   it('rejects empty entries and deletes cleanly', () => {

@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { modelUsable, useModel } from '../ai/modelStore';
 import { warmUp } from '../ai/runtime';
 import type { ReplySource } from '../assistant/assistant';
+import type { ActionType } from '../assistant/schema';
 import { actionCard, resolveAction, resolveProposal, sendChatMessage, useChatSession, type ChatEntry } from '../conversation/chatSession';
 import { emit } from '../services/bus';
 import { useGame } from '../state/gameStore';
@@ -25,10 +26,11 @@ const STARTERS = [
   'How are you?',
 ];
 
-const SOURCE_LABEL: Record<ReplySource, string> = {
+// Scripted replies carry no tag; AI replies always say so.
+const SOURCE_LABEL: Record<ReplySource, string | null> = {
   ai: 'On-device AI',
   parser: 'Built-in parser',
-  scripted: 'Simple reply',
+  scripted: null,
   command: 'Built-in',
 };
 
@@ -97,7 +99,7 @@ export function TalkPanel() {
         ? 'AI loading…'
         : model.state === 'downloading' || model.state === 'verifying'
           ? 'AI downloading…'
-          : 'Simple replies';
+          : null;
 
   const recording = voice.phase === 'recording';
   const transcribing = voice.phase === 'transcribing' || voice.phase === 'starting';
@@ -107,9 +109,9 @@ export function TalkPanel() {
       <PanelHeader
         title={`Talk with ${name}`}
         right={
-          <PressableScale accessibilityRole="button" accessibilityLabel="About how the character talks" onPress={() => setShowInfo((v) => !v)} style={styles.enginePill}>
+          <PressableScale accessibilityRole="button" accessibilityLabel="About how the character talks" onPress={() => setShowInfo((v) => !v)} style={[styles.enginePill, !pill && styles.engineIconOnly]}>
             <Ionicons name={aiOn ? 'hardware-chip-outline' : 'cloud-offline-outline'} size={13} color={aiOn ? colors.brand : colors.textDim} />
-            <Text style={styles.engineText}>{pill}</Text>
+            {pill && <Text style={styles.engineText}>{pill}</Text>}
           </PressableScale>
         }
       />
@@ -202,7 +204,7 @@ function Message({ entry: e }: { entry: ChatEntry }) {
       <View style={[styles.bubble, mine ? styles.bubbleUser : styles.bubbleChar]}>
         <Text style={[styles.bubbleText, mine && { color: colors.onAccent }]}>{e.text || '…'}</Text>
       </View>
-      {!mine && e.source && !e.streaming && <Text style={styles.source}>{SOURCE_LABEL[e.source]}</Text>}
+      {!mine && e.source && SOURCE_LABEL[e.source] && !e.streaming && <Text style={styles.source}>{SOURCE_LABEL[e.source]}</Text>}
       {!mine && e.note && <Text style={styles.source}>{e.note}</Text>}
       {e.items && e.items.length > 0 && (
         <View style={styles.items}>
@@ -238,6 +240,15 @@ function Message({ entry: e }: { entry: ChatEntry }) {
   );
 }
 
+/** The confirm card's icon matches what it changes (the same icons as the Planner's add menu). */
+function actionIcon(type: ActionType): React.ComponentProps<typeof Ionicons>['name'] {
+  if (type.endsWith('Event') || type === 'listEvents') return 'calendar';
+  if (type.endsWith('Habit') || type === 'habitProgress') return 'leaf';
+  if (type.endsWith('Chore') || type === 'listChores') return 'checkbox';
+  if (type.endsWith('Journal')) return 'create';
+  return 'sparkles';
+}
+
 function ActionCard({ entry }: { entry: ChatEntry }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
@@ -246,7 +257,7 @@ function ActionCard({ entry }: { entry: ChatEntry }) {
   return (
     <View style={styles.proposal}>
       <View style={styles.proposalHead}>
-        <Ionicons name="calendar" size={14} color={colors.accent} />
+        <Ionicons name={actionIcon(a.action.type)} size={14} color={colors.accent} />
         <Text style={styles.proposalLabel}>{card.heading}</Text>
       </View>
       {card.lines.map((l, i) => (
@@ -317,6 +328,7 @@ const makeStyles = (colors: Colors) =>
       borderRadius: 14,
       backgroundColor: colors.surface,
     },
+    engineIconOnly: { width: 28, paddingHorizontal: 0, justifyContent: 'center' },
     engineText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textDim },
     info: { marginHorizontal: 16, marginBottom: 6, padding: 12, borderRadius: radii.md, backgroundColor: colors.surface, gap: 8 },
     infoText: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, color: colors.textDim },

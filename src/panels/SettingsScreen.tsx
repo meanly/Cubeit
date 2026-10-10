@@ -53,7 +53,7 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
   const name = useGame((s) => s.character.name);
   const set = useGame((s) => s.setSettings);
   const [draftName, setDraftName] = useState(name);
-  const [engines, setEngines] = useState<{ label: string; available: boolean; detail: string }[]>([]);
+  const [engines, setEngines] = useState<{ kind: string; label: string; available: boolean; detail: string }[]>([]);
 
   // Re-read whenever the model is installed, loaded or removed.
   const modelState = useModel((s) => s.status.state);
@@ -160,7 +160,8 @@ function SettingsContent({ onClose }: { onClose: () => void }) {
                 <Text style={styles.rowLabel}>
                   {e.label} {e.available ? '· in use' : '· not available'}
                 </Text>
-                <Text style={styles.hint}>{e.detail}</Text>
+                {/* The model card above already says why the on-device model isn't available. */}
+                {!(e.kind === 'local-model' && !e.available) && <Text style={styles.hint}>{e.detail}</Text>}
               </View>
             </View>
           ))}
@@ -360,7 +361,8 @@ const makeStyles = (colors: Colors) =>
     flex: 1,
     height: 44,
     borderRadius: radii.md,
-    backgroundColor: colors.paper,
+    // Surface, not paper: the field sits on a paper card and would disappear into it.
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     color: colors.text,
     fontFamily: fonts.bold,

@@ -4,9 +4,26 @@
     {
       "name": "cubeit-web",
       "runtimeExecutable": "node",
-      "runtimeArgs": [".claude/start-web.mjs"],
+      "runtimeArgs": [
+        ".claude/start-web.mjs"
+      ],
       "port": 8081,
       "autoPort": true
+    },
+    {
+      "name": "cubeit-video",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../../cubeit-video",
+        "run",
+        "dev",
+        "--",
+        "--no-open",
+        "--port",
+        "3123"
+      ],
+      "port": 3123
     }
   ]
 }

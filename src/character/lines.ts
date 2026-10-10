@@ -34,6 +34,17 @@ export const LINES = {
   plant: ['Smells green!', 'Grow, little sprout!'],
   finds: ['My treasures!', 'Look at my finds!'],
   frame: ['That’s us!', 'Best friends!'],
+  watered: ['Drink up, sprout!', 'There you go!', 'Grow big!'],
+  overwatered: ['It’s had plenty!', 'Any more and it’ll swim!', 'Too much water!'],
+  blinky: ['Blinky blinky!', 'My eyes! Hehe.', 'On, off, on…'],
+  poster: ['That one’s my favorite!', 'Connect the stars!'],
+  bird: ['A birdie!', 'Hi, bird!'],
+  shootingStar: ['A shooting star!', 'Make a wish!'],
+  lights: ['Twinkly!', 'Party lights!'],
+  mobile: ['Got it!', 'Spin, moon!'],
+  bounce: ['Boing!', 'Bouncy bed!', 'Wheee!'],
+  comfy: ['So comfy…', 'Ahh, cozy.', 'Fluffy!'],
+  again: ['Again? Hehe.', 'Okay, okay!', 'You really like that one!'],
 } as const;
 
 export function greetingFor(hour: number, name: string | undefined, daysAway: number | null): string {

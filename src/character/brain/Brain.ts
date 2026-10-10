@@ -165,7 +165,8 @@ export class Brain {
             off();
             resolve(arrived);
           };
-          const timeout = setTimeout(() => done(false), (dist / Math.max(0.05, speed)) * 2000 + 1500);
+          // Generous: he eases in near the target and can be nudged by the ball on the way.
+          const timeout = setTimeout(() => done(false), (dist / Math.max(0.05, speed)) * 3500 + 2000);
           this.arrivals.set(id, () => done(true));
           const off = token.onCancel(() => {
             clearTimeout(timeout);
@@ -362,7 +363,11 @@ export class Brain {
         if (this.mode !== 'free') return;
         return this.interrupt(B.chaseBall(4500, true));
       case 'itemTapped':
-        if (this.mode !== 'free') return;
+        if (this.mode !== 'free') {
+          // Busy (talking, a game…): the lamp still switches, without the walk over.
+          if (event.item === 'lamp') game.setLamp(!game.room.lampOn);
+          return;
+        }
         void B.grantXp('item');
         return this.interrupt(B.reactToItem(event.slot, event.item, true));
       case 'greet':

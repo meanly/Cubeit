@@ -82,7 +82,12 @@
 - **Furniture**: add an `ItemDef` in `content/items.ts` and a draw function in
   `ITEM_DRAW` (`room/items/pixelArt.ts`), drawing into its slot's bitmap
   (`SLOT_DOTS`). Placement and interaction come from the slot and
-  `interaction` kind.
+  `interaction` kind. Using an item is a routine in `reactToItem`
+  (`brain/behaviors.ts`) with its own stickman state (watering the sprout,
+  reading, tugging the lamp's chain, peeking out of the window, sitting…;
+  props like the can and the book are stamped at his hand in `stickman.ts`)
+  and a pixel effect on the furniture (`playItemFx`, `room/itemFx.ts`: the
+  lamp's rays, a flower, a bird, hearts…). There is no real lighting, only dots.
 - **Themes / accessories**: data in `content/*`; each theme's wallpaper is a
   pattern in `wallpaper()` (`room/items/pixelArt.ts`). Light tints and body
   colors are still saved but have no effect on the monochrome screen.

@@ -32,16 +32,19 @@ export function Label({ children }: { children: string }) {
 }
 
 /** A round check button. */
-export function Check({ checked, onPress, label, size = 26 }: { checked: boolean; onPress: () => void; label: string; size?: number }) {
+/** A round check. `disabled` shows it dimmed and ignores taps (e.g. a chore that isn't due yet). */
+export function Check({ checked, onPress, label, size = 26, disabled }: { checked: boolean; onPress: () => void; label: string; size?: number; disabled?: boolean }) {
   const colors = useColors();
   return (
     <PressableScale
       accessibilityRole="checkbox"
       accessibilityLabel={label}
-      accessibilityState={{ checked }}
+      accessibilityState={{ checked, disabled: !!disabled }}
       onPress={onPress}
+      disabled={disabled}
       hitSlop={8}
       style={{
+        opacity: disabled ? 0.35 : 1,
         width: size,
         height: size,
         borderRadius: size / 2,
@@ -104,6 +107,27 @@ export function LinkRow({ icon, title, detail, onPress, tint }: { icon: IconName
   );
 }
 
+/** The big, easy-to-find way to add something, right where the list is (not just a small "+" up top). */
+export function AddRow({ label, detail, onPress }: { label: string; detail?: string; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useStyles(makeStyles);
+  return (
+    <PressableScale accessibilityRole="button" accessibilityLabel={detail ? `${label}. ${detail}` : label} onPress={onPress} style={styles.addRow}>
+      <View style={styles.addIcon}>
+        <Ionicons name="add" size={18} color={colors.onAccent} />
+      </View>
+      <View style={styles.linkText}>
+        <Text style={styles.addLabel}>{label}</Text>
+        {detail ? (
+          <Text style={styles.hint} numberOfLines={2}>
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+    </PressableScale>
+  );
+}
+
 /** Flat text tabs with an underline: the planner's one level of navigation. */
 export function TabBar<T extends string>({ options, value, onChange }: { options: readonly { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   const styles = useStyles(makeStyles);
@@ -141,7 +165,10 @@ export function Muted({ children }: { children: ReactNode }) {
   return <Text style={styles.muted}>{children}</Text>;
 }
 
-/** Month grid with dots for marked days. Used by the calendar and the date picker. */
+/** Extra height under each day's circle for its dots, so they never overlap the circle. */
+const DOT_ROW = 4;
+
+/** Month grid with a small colored dot per kind of thing on a day. Used by the calendar and the date pickers. */
 export function MonthGridView({
   month,
   selected,
@@ -153,7 +180,8 @@ export function MonthGridView({
   month: DayKey;
   selected: DayKey | null;
   today: DayKey;
-  marks?: ReadonlySet<DayKey>;
+  /** Dot colors per day (at most three are drawn). */
+  marks?: ReadonlyMap<DayKey, readonly string[]>;
   onSelect: (day: DayKey) => void;
   compact?: boolean;
 }) {
@@ -183,15 +211,21 @@ export function MonthGridView({
                 key={day}
                 haptic={false}
                 accessibilityRole="button"
-                accessibilityLabel={`${formatDay(day, today)}${marks?.has(day) ? ', has events' : ''}`}
+                accessibilityLabel={`${formatDay(day, today)}${marks?.has(day) ? ', has plans' : ''}`}
                 accessibilityState={{ selected: isSel }}
                 onPress={() => onSelect(day)}
-                style={[styles.dayCell, { width: `${100 / 7}%`, height: cell }]}
+                style={[styles.dayCell, { width: `${100 / 7}%`, height: cell + DOT_ROW }]}
               >
                 <View style={[styles.dayInner, { width: cell - 6, height: cell - 6, borderRadius: (cell - 6) / 2 }, isSel && { backgroundColor: colors.brand }, !isSel && isToday && styles.todayRing]}>
                   <Text style={[styles.dayText, !inMonth && { color: colors.textFaint }, isSel && { color: colors.onAccent }]}>{d.getDate()}</Text>
                 </View>
-                {marks?.has(day) && <View style={[styles.dot, isSel && { backgroundColor: colors.brand }]} />}
+                {marks?.has(day) && (
+                  <View style={styles.dots}>
+                    {marks.get(day)!.slice(0, 3).map((c) => (
+                      <View key={c} style={[styles.dot, { backgroundColor: c }]} />
+                    ))}
+                  </View>
+                )}
               </PressableScale>
             );
           })}
@@ -303,6 +337,20 @@ export const makeStyles = (colors: Colors) =>
     group: { borderRadius: radii.md, backgroundColor: colors.surface, overflow: 'hidden' },
     divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.lineStrong, marginLeft: 12 },
     linkText: { flex: 1, gap: 2 },
+    addRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 12,
+      minHeight: 54,
+      paddingVertical: 10,
+      borderRadius: radii.md,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: colors.lineStrong,
+    },
+    addIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+    addLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.brand },
     linkTitle: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
     tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineStrong },
     tab: { flex: 1, alignItems: 'center', paddingTop: 6, minHeight: 40, justifyContent: 'space-between' },
@@ -316,11 +364,13 @@ export const makeStyles = (colors: Colors) =>
     weekHead: { flexDirection: 'row' },
     weekHeadText: { textAlign: 'center', fontFamily: fonts.medium, fontSize: 11, color: colors.textFaint, paddingVertical: 4 },
     weekRow: { flexDirection: 'row' },
-    dayCell: { alignItems: 'center', justifyContent: 'center' },
+    // The day's circle sits at the top; the dots get their own strip under it.
+    dayCell: { alignItems: 'center', justifyContent: 'flex-start', paddingTop: 1 },
     dayInner: { alignItems: 'center', justifyContent: 'center' },
     todayRing: { borderWidth: 1.5, borderColor: colors.brand },
     dayText: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
-    dot: { position: 'absolute', bottom: 2, width: 5, height: 5, borderRadius: 3, backgroundColor: colors.brand },
+    dots: { position: 'absolute', bottom: 1, flexDirection: 'row', gap: 2 },
+    dot: { width: 5, height: 5, borderRadius: 3 },
     dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dateValue: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 14, borderRadius: radii.md, backgroundColor: colors.surface },
     dateText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { modelUsable, useModel } from '../../ai/modelStore';
 import { summaryMessages } from '../../ai/prompts';
@@ -8,18 +8,17 @@ import { complete } from '../../ai/runtime';
 import { cleanModelText } from '../../conversation/llm/localModelEngine';
 import { addDays, addMonths, dayDate, dayKey, diffDays, formatDay, formatMonth, MONTH_SHORT, startOfWeek, type DayKey } from '../../planner/dates';
 import { describeSummary, lastNDays, MOOD_LABEL, promptOfTheDay, searchJournal, summarizeJournal } from '../../planner/journal';
-import { eventsOn } from '../../planner/ops';
 import { choreStatus } from '../../planner/recurrence';
-import { useGame } from '../../state/gameStore';
-import { useMemories } from '../../state/memoryStore';
+import type { ChoreCompletion } from '../../planner/types';
 import { usePlanner } from '../../state/plannerStore';
 import { useUi } from '../../state/uiStore';
 import { useColors, useStyles, type Colors } from '../../theme/theme';
 import { fonts, radii } from '../../theme/tokens';
 import { Button, Chip, IconButton } from '../../ui/primitives';
 import { EmptyState } from '../PanelHost';
-import { ChoreRow, EventRow, HabitRow, type Open } from './rows';
-import { Card, Group, LinkRow, MonthGridView, Muted, SectionHeader } from './ui';
+import { CalendarLegend, DayAgenda, useCalendarMarks } from './DayAgenda';
+import { ChoreDoneRow, ChoreRow, HabitRow, JournalRow, type Open } from './rows';
+import { AddRow, Card, Group, MonthGridView, SectionHeader } from './ui';
 
 // ───────────────────────── calendar ─────────────────────────
 
@@ -33,15 +32,14 @@ type CalMode = 'week' | 'month';
 export function CalendarTab({ today, day, setDay, open }: { today: DayKey; day: DayKey; setDay: Dispatch<SetStateAction<DayKey>>; open: Open }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
-  const events = usePlanner((s) => s.events);
   const [mode, setMode] = useState<CalMode>('month');
-  const marks = useMemo(() => new Set(events.map((e) => e.day)), [events]);
+  const marks = useCalendarMarks();
 
   const step = (dir: -1 | 1) => setDay((c) => (mode === 'week' ? addDays(c, dir * 7) : addMonths(c, dir, 1)));
   const weekStart = startOfWeek(day);
   const title = mode === 'week' ? weekTitle(weekStart) : formatMonth(day);
   const onToday = day === today;
-  const list = eventsOn(events, day);
+  const past = diffDays(today, day) < 0;
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
@@ -73,34 +71,20 @@ export function CalendarTab({ today, day, setDay, open }: { today: DayKey; day: 
       {mode === 'month' && (
         <>
           <MonthGridView month={day} selected={day} today={today} marks={marks} onSelect={setDay} />
+          <CalendarLegend />
           <SectionHeader title={formatDay(day, today)} />
-          {list.length === 0 ? (
-            <Muted>{diffDays(today, day) < 0 ? 'Nothing was planned.' : 'Nothing planned. Tap + to add an event.'}</Muted>
-          ) : (
-            <Group>
-              {list.map((e) => (
-                <EventRow key={e.id} event={e} today={today} open={open} />
-              ))}
-            </Group>
-          )}
+          <DayAgenda day={day} today={today} open={open} />
+          {!past && <AddRow label="Add event" onPress={() => open({ name: 'event', day })} />}
         </>
       )}
 
       {mode === 'week' &&
         [0, 1, 2, 3, 4, 5, 6].map((i) => {
           const d = addDays(weekStart, i);
-          const dayEvents = eventsOn(events, d);
           return (
             <View key={d} style={styles.weekDay}>
-              <View style={styles.weekHead}>
-                <Text style={[styles.weekLabel, d === today && { color: colors.brand }]}>{formatDay(d, today)}</Text>
-                {dayEvents.length === 0 && <Text style={styles.free}>Free</Text>}
-              </View>
-              <Group>
-                {dayEvents.map((e) => (
-                  <EventRow key={e.id} event={e} today={today} open={open} />
-                ))}
-              </Group>
+              <Text style={[styles.weekLabel, d === today && { color: colors.brand }]}>{formatDay(d, today)}</Text>
+              <DayAgenda day={d} today={today} open={open} compact />
             </View>
           );
         })}
@@ -127,10 +111,7 @@ export function HabitsTab({ today, open }: { today: DayKey; open: Open }) {
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
       {active.length === 0 ? (
-        <>
-          <EmptyState icon="leaf-outline" title="No habits yet" body="Start small: one thing, a few days a week. Routines are habits made of steps, like a morning routine." />
-          <Button compact icon="sparkles-outline" label="Pick from templates" onPress={() => open({ name: 'habit' })} />
-        </>
+        <EmptyState icon="leaf-outline" title="No habits yet" body="Start small: one thing, a few days a week. Routines are habits made of steps, like a morning routine." />
       ) : (
         <Group style={styles.top}>
           {active.map((h) => (
@@ -138,6 +119,10 @@ export function HabitsTab({ today, open }: { today: DayKey; open: Open }) {
           ))}
         </Group>
       )}
+      <AddRow
+        label={active.length === 0 ? 'Add your first habit' : 'Add another habit'}
+        onPress={() => open({ name: 'habit' })}
+      />
       {archived.length > 0 && (
         <>
           <Button compact tone="ghost" label={showArchived ? 'Hide archived' : `Show archived (${archived.length})`} onPress={() => setShowArchived((v) => !v)} />
@@ -159,23 +144,51 @@ export function HabitsTab({ today, open }: { today: DayKey; open: Open }) {
 
 // ───────────────────────── chores ─────────────────────────
 
+/**
+ * Chores by day: overdue first, then today (to do and done), then each later
+ * day with its chores locked until that day, then undated ones. Earlier days'
+ * finished chores are one tap away.
+ */
 export function ChoresTab({ today, open }: { today: DayKey; open: Open }) {
   const styles = useStyles(makeStyles);
   const chores = usePlanner((s) => s.chores);
   const history = usePlanner((s) => s.choreHistory);
-  const [showDone, setShowDone] = useState(false);
+  const [showEarlier, setShowEarlier] = useState(false);
+  // The earlier days open below the fold; once they're laid out, scroll them into view.
+  const scroll = useRef<ScrollView>(null);
+  const earlierY = useRef(0);
+  const revealEarlier = useRef(false);
+  const toggleEarlier = () => {
+    revealEarlier.current = !showEarlier;
+    setShowEarlier((v) => !v);
+  };
+
   const pending = chores
     .filter((c) => choreStatus(c, today) !== 'done')
-    .sort((a, b) => (a.due ?? '9999-99-99').localeCompare(b.due ?? '9999-99-99'));
+    .sort((a, b) => (a.due ?? '9999-99-99').localeCompare(b.due ?? '9999-99-99') || (a.dueTime ?? '99:99').localeCompare(b.dueTime ?? '99:99'));
   const overdue = pending.filter((c) => choreStatus(c, today) === 'overdue');
-  const todo = pending.filter((c) => choreStatus(c, today) !== 'overdue');
-  const finished = [...history].sort((a, b) => b.at - a.at).slice(0, 40);
+  const dueToday = pending.filter((c) => c.due === today);
+  const anytime = pending.filter((c) => !c.due);
+  const laterDays = [...new Set(pending.filter((c) => c.due && diffDays(today, c.due) > 0).map((c) => c.due!))];
+  const doneToday = history.filter((h) => dayKey(h.at) === today).sort((a, b) => b.at - a.at);
+  const earlier = groupByDay(history.filter((h) => diffDays(dayKey(h.at), today) > 0 && diffDays(dayKey(h.at), today) <= 14));
+
+  const todayTotal = dueToday.length + doneToday.length;
+  const nothing = pending.length === 0 && doneToday.length === 0;
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.list}>
-      {pending.length === 0 && (
-        <EmptyState icon="sparkles-outline" title="All clear" body="No chores waiting. Tap + to add one, or say “add laundry every Sunday” in Talk." />
-      )}
+    <ScrollView
+      ref={scroll}
+      style={styles.flex}
+      contentContainerStyle={styles.list}
+      onContentSizeChange={() => {
+        if (!revealEarlier.current) return;
+        revealEarlier.current = false;
+        scroll.current?.scrollTo({ y: Math.max(0, earlierY.current - 8), animated: true });
+      }}
+    >
+      {nothing && <EmptyState icon="sparkles-outline" title="All clear" body="No chores waiting. Add one below, or say “add laundry every Sunday” in Talk." />}
+
       {overdue.length > 0 && (
         <>
           <SectionHeader title={`Overdue · ${overdue.length}`} />
@@ -186,42 +199,95 @@ export function ChoresTab({ today, open }: { today: DayKey; open: Open }) {
           </Group>
         </>
       )}
-      {todo.length > 0 && (
+
+      {todayTotal > 0 && (
         <>
-          {overdue.length > 0 ? <SectionHeader title="To do" /> : <View style={styles.top} />}
+          <SectionHeader title="Today" right={<Text style={styles.count}>{`${doneToday.length}/${todayTotal} done`}</Text>} />
+          {dueToday.length > 0 ? (
+            <>
+              <Text style={styles.subLabel}>{`To do · ${dueToday.length}`}</Text>
+              <Group>
+                {dueToday.map((c) => (
+                  <ChoreRow key={c.id} chore={c} today={today} open={open} showDue={false} />
+                ))}
+              </Group>
+            </>
+          ) : (
+            <Text style={styles.allDone}>Everything for today is done. Nice!</Text>
+          )}
+          {doneToday.length > 0 && (
+            <>
+              <Text style={styles.subLabel}>{`Done · ${doneToday.length}`}</Text>
+              <Group>
+                {doneToday.map((h) => (
+                  <ChoreDoneRow key={`${h.choreId}-${h.at}`} record={h} today={today} open={open} />
+                ))}
+              </Group>
+            </>
+          )}
+        </>
+      )}
+
+      <AddRow label={nothing ? 'Add a chore' : 'Add another chore'} onPress={() => open({ name: 'chore' })} />
+
+      {laterDays.map((d) => (
+        <View key={d} style={styles.daySection}>
+          <SectionHeader title={formatDay(d, today)} />
           <Group>
-            {todo.map((c) => (
-              <ChoreRow key={c.id} chore={c} today={today} open={open} />
+            {pending
+              .filter((c) => c.due === d)
+              .map((c) => (
+                <ChoreRow key={c.id} chore={c} today={today} open={open} showDue={false} />
+              ))}
+          </Group>
+        </View>
+      ))}
+
+      {anytime.length > 0 && (
+        <>
+          <SectionHeader title="Anytime" />
+          <Group>
+            {anytime.map((c) => (
+              <ChoreRow key={c.id} chore={c} today={today} open={open} showDue={false} />
             ))}
           </Group>
         </>
       )}
-      {finished.length > 0 && (
+
+      {earlier.length > 0 && (
         <>
-          <Button compact tone="ghost" label={showDone ? 'Hide finished' : 'Show recently finished'} onPress={() => setShowDone((v) => !v)} />
-          {showDone && (
-            <Group>
-              {finished.map((h, i) => {
-                const chore = chores.find((c) => c.id === h.choreId);
-                return (
-                  <Card key={`${h.choreId}-${h.at}-${i}`} flat onPress={chore ? () => open({ name: 'chore', chore }) : undefined} label={h.title}>
-                    <Ionicons name="checkmark-circle" size={20} color={styles.doneIcon.color} />
-                    <View style={styles.flex}>
-                      <Text style={styles.cardTitle}>{h.title}</Text>
-                      <Text style={styles.cardMeta}>
-                        Done {formatDay(dayKey(h.at), today).toLowerCase()}
-                        {h.due ? ` · was due ${formatDay(h.due, today).toLowerCase()}` : ''}
-                      </Text>
-                    </View>
-                  </Card>
-                );
-              })}
-            </Group>
-          )}
+          <View
+            onLayout={(e) => {
+              earlierY.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <Button compact tone="ghost" label={showEarlier ? 'Hide earlier days' : 'Show earlier days'} onPress={toggleEarlier} />
+          </View>
+          {showEarlier &&
+            earlier.map(([d, records]) => (
+              <View key={d} style={styles.daySection}>
+                <SectionHeader title={formatDay(d, today)} right={<Text style={styles.count}>{`${records.length} done`}</Text>} />
+                <Group>
+                  {records.map((h) => (
+                    <ChoreDoneRow key={`${h.choreId}-${h.at}`} record={h} today={today} open={open} />
+                  ))}
+                </Group>
+              </View>
+            ))}
         </>
       )}
     </ScrollView>
   );
+}
+
+/** Completions grouped by the day they were done, newest day (and newest first) at the top. */
+function groupByDay(records: readonly ChoreCompletion[]): [DayKey, ChoreCompletion[]][] {
+  const byDay = new Map<DayKey, ChoreCompletion[]>();
+  for (const h of [...records].sort((a, b) => b.at - a.at)) {
+    const d = dayKey(h.at);
+    byDay.set(d, [...(byDay.get(d) ?? []), h]);
+  }
+  return [...byDay.entries()];
 }
 
 // ───────────────────────── journal ─────────────────────────
@@ -230,8 +296,6 @@ export function JournalTab({ today, open }: { today: DayKey; open: Open }) {
   const colors = useColors();
   const styles = useStyles(makeStyles);
   const journal = usePlanner((s) => s.journal);
-  const memoryCount = useMemories((s) => s.items.length);
-  const name = useGame((s) => s.character.name);
   const [query, setQuery] = useState('');
   const model = useModel((s) => s.status);
   const [aiSummary, setAiSummary] = useState<{ text: string; error?: boolean } | null>(null);
@@ -269,36 +333,29 @@ export function JournalTab({ today, open }: { today: DayKey; open: Open }) {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-      <View style={[styles.search, styles.top]}>
-        <Ionicons name="search" size={16} color={colors.textFaint} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search your journal"
-          placeholderTextColor={colors.textFaint}
-          style={styles.searchInput}
-          accessibilityLabel="Search your journal"
-          autoCorrect={false}
-        />
-        {query.length > 0 && <IconButton icon="close" label="Clear search" onPress={() => setQuery('')} size={16} />}
-      </View>
-
+      <View style={styles.top} />
       {!query && (
-        <Group>
-          <LinkRow
-            icon={wroteToday ? 'checkmark-circle' : 'create-outline'}
-            tint={wroteToday ? colors.success : undefined}
-            title={wroteToday ? 'You wrote today. Add more?' : prompt}
-            detail={wroteToday ? undefined : 'Today’s prompt'}
-            onPress={() => open(wroteToday ? { name: 'journal' } : { name: 'journal', initial: { prompt } })}
+        <AddRow
+          label={wroteToday ? 'Write another entry' : 'New entry'}
+          detail={wroteToday ? undefined : `Today’s prompt: ${prompt}`}
+          onPress={() => open(wroteToday ? { name: 'journal' } : { name: 'journal', initial: { prompt } })}
+        />
+      )}
+
+      {journal.length > 0 && (
+        <View style={styles.search}>
+          <Ionicons name="search" size={16} color={colors.textFaint} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search your journal"
+            placeholderTextColor={colors.textFaint}
+            style={styles.searchInput}
+            accessibilityLabel="Search your journal"
+            autoCorrect={false}
           />
-          <LinkRow
-            icon="bookmark-outline"
-            title="Memories"
-            detail={memoryCount > 0 ? `${memoryCount} saved · what ${name} remembers` : `What ${name} remembers about you`}
-            onPress={() => open({ name: 'memories' })}
-          />
-        </Group>
+          {query.length > 0 && <IconButton icon="close" label="Clear search" onPress={() => setQuery('')} size={16} />}
+        </View>
       )}
 
       {!query && summary.count > 0 && (
@@ -331,25 +388,17 @@ export function JournalTab({ today, open }: { today: DayKey; open: Open }) {
       )}
 
       {list.length === 0 ? (
-        query ? <EmptyState icon="search-outline" title="Nothing found" body="Try another word." /> : <Muted>Your entries show up here. Only you can see them, and they never leave this phone.</Muted>
+        query ? (
+          <EmptyState icon="search-outline" title="Nothing found" body="Try another word." />
+        ) : (
+          <EmptyState icon="book-outline" title="Your journal is empty" body="Write a few lines about your day, add a photo or two. Only you can see it, and it never leaves this phone." />
+        )
       ) : (
         <>
           <SectionHeader title={query ? `Results · ${list.length}` : 'Entries'} />
           <Group>
             {list.map((e) => (
-              <Card key={e.id} flat onPress={() => open({ name: 'journal', entry: e })} label={`Journal entry, ${formatDay(e.day, today)}`} style={styles.entry}>
-                <View style={styles.flex}>
-                  <Text style={styles.cardMeta}>
-                    {formatDay(e.day, today)}
-                    {e.mood ? ` · ${MOOD_LABEL[e.mood]}` : ''}
-                  </Text>
-                  {e.title && <Text style={styles.cardTitle}>{e.title}</Text>}
-                  <Text style={styles.entryText} numberOfLines={3}>
-                    {e.text}
-                  </Text>
-                </View>
-                {e.images[0] && <Image source={{ uri: e.images[0] }} style={styles.thumb} accessibilityLabel="Attached photo" />}
-              </Card>
+              <JournalRow key={e.id} entry={e} today={today} open={open} />
             ))}
           </Group>
         </>
@@ -369,13 +418,14 @@ const makeStyles = (colors: Colors) =>
     todayText: { fontFamily: fonts.bold, fontSize: 13, color: colors.brand },
     dim: { opacity: 0.35 },
     weekDay: { gap: 6, marginTop: 6 },
-    weekHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
     weekLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.textDim },
-    free: { fontFamily: fonts.regular, fontSize: 12, color: colors.textFaint },
     rowButtons: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     archived: { fontFamily: fonts.medium, fontSize: 14, color: colors.textDim },
     faint: { color: colors.textFaint },
-    doneIcon: { color: colors.success },
+    count: { fontFamily: fonts.medium, fontSize: 12, color: colors.textFaint },
+    subLabel: { fontFamily: fonts.medium, fontSize: 12, color: colors.textDim, marginTop: 2 },
+    allDone: { fontFamily: fonts.medium, fontSize: 13, color: colors.success, paddingVertical: 4 },
+    daySection: { gap: 8 },
     cardTitle: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
     cardMeta: { fontFamily: fonts.regular, fontSize: 12, color: colors.textFaint },
     search: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, minHeight: 44, borderRadius: radii.md, backgroundColor: colors.surface },
@@ -385,7 +435,4 @@ const makeStyles = (colors: Colors) =>
     aiLabel: { fontFamily: fonts.bold, fontSize: 11, color: colors.brand, letterSpacing: 0.3 },
     aiText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text },
     aiLink: { fontFamily: fonts.medium, fontSize: 12, color: colors.brand },
-    entry: { alignItems: 'flex-start' },
-    entryText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text, marginTop: 2 },
-    thumb: { width: 56, height: 56, borderRadius: radii.sm, backgroundColor: colors.surfacePressed },
   });

@@ -25,7 +25,7 @@ Run lint and typecheck before declaring any task done.
 
 ## Project conventions (Cubeit)
 
-- Single-screen app: the room is always visible; Talk / Play / Customize / Planner / Nearby / Notifications are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used. The Planner sheet (`src/panels/planner/`) replaced the Memories sheet; memories (plus Finds and About) open from its Journal tab. The sheet has one row of tabs and one "+" in the header; editors and detail screens stack on top of the tabs.
+- Single-screen app: the room is always visible; Talk / Play / Customize / Planner / Nearby / Notifications / Friend are bottom sheets (`src/panels/PanelHost.tsx`) and Settings is a modal. Expo Router is intentionally not used. The Planner sheet (`src/panels/planner/`) has Calendar / Journal / Habits / Chores tabs, an "Add …" row in each list plus a "+" drop-down in the header; editors stack on top of the tabs. Memories, Finds and About live in the Friend sheet (`src/panels/friend/`), opened from the Friendship card on Home.
 - Per-frame work (physics, sensor, animated styles) stays on the UI thread in worklets; JS moves bodies only through `world.commands`. See `docs/ARCHITECTURE.md`.
 - UI colors come from `useColors()` / `useStyles(makeStyles)` (light and dark palettes in `src/theme/tokens.ts`); never hard-code a palette color in a component.
 - Write shared values with `.set()` (React Compiler lint rules flag `.value =` outside worklets).

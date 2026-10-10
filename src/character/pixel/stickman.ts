@@ -104,6 +104,16 @@ const STATE_ORDER: readonly CharacterState[] = [
   'waving',
   'love',
   'hidden',
+  'watering',
+  'reading',
+  'reaching',
+  'tugging',
+  'peeking',
+  'pointing',
+  'checkingWatch',
+  'clapping',
+  'presenting',
+  'sitting',
 ];
 const S_IDLE = 0;
 const S_LOOK = 2;
@@ -122,6 +132,27 @@ const S_HELD = 14;
 const S_DANCING = 15;
 const S_SLIDING = 16;
 const S_LOVE = 18;
+const S_WATERING = 20;
+const S_READING = 21;
+const S_REACHING = 22;
+const S_TUGGING = 23;
+const S_PEEKING = 24;
+const S_POINTING = 25;
+const S_WATCH = 26;
+const S_CLAPPING = 27;
+const S_PRESENTING = 28;
+const S_SITTING = 29;
+
+/** Things held in the hand, stamped at the hand ('#' ink, 'o' cleared). */
+const PROP_NONE = 0;
+const PROP_CAN = 1;
+const PROP_BOOK = 2;
+// A watering can held by its handle (the hand is at column 1 of the top row), spout to the right.
+const CAN = ['.##......', '#..#...##', '#####.#..', '######...', '#####....', '#####....'];
+const CAN_TIP_C = 8;
+const CAN_TIP_R = 1;
+// An open book held up in both hands, seen from the back.
+const BOOK = ['.##.##.', '#oo#oo#', '#oo#oo#', '###.###'];
 
 const ACCESSORY_ORDER: readonly AccessoryId[] = ['none', 'sprout', 'bow', 'beanie', 'headphones', 'scarf', 'crown'];
 
@@ -398,6 +429,81 @@ export interface StickmanRaster {
 }
 
 /** Poses the skeleton for this frame and rasterizes it to dots. */
+/**
+ * Joins every loose group of body dots to the biggest one with a short bridge,
+ * so no hand, foot or head is ever drawn floating. `keepSingles` leaves lone
+ * dots alone (the watering can's drips).
+ */
+function joinStrays(grid: number[], keepSingles: boolean) {
+  'worklet';
+  const N = GRID * GRID;
+  const label: number[] = new Array(N).fill(-1);
+  const sizes: number[] = [];
+  const stack: number[] = [];
+  for (let i = 0; i < N; i++) {
+    if (grid[i] !== 1 || label[i] >= 0) continue;
+    const id = sizes.length;
+    let size = 0;
+    label[i] = id;
+    stack.push(i);
+    while (stack.length > 0) {
+      const j = stack.pop()!;
+      size++;
+      const c = j % GRID;
+      const r = (j - c) / GRID;
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          const cc = c + dc;
+          const rr = r + dr;
+          if (cc < 0 || rr < 0 || cc >= GRID || rr >= GRID) continue;
+          const k = rr * GRID + cc;
+          if (grid[k] === 1 && label[k] < 0) {
+            label[k] = id;
+            stack.push(k);
+          }
+        }
+    }
+    sizes.push(size);
+  }
+  if (sizes.length < 2) return;
+  let main = 0;
+  for (let id = 1; id < sizes.length; id++) if (sizes[id] > sizes[main]) main = id;
+  for (let id = 0; id < sizes.length; id++) {
+    if (id === main || (keepSingles && sizes[id] === 1)) continue;
+    // The closest pair of dots between this piece and the body.
+    let best = Infinity;
+    let a = -1;
+    let b = -1;
+    for (let i = 0; i < N; i++) {
+      if (label[i] !== id) continue;
+      const ic = i % GRID;
+      const ir = (i - ic) / GRID;
+      for (let j = 0; j < N; j++) {
+        if (label[j] !== main) continue;
+        const jc = j % GRID;
+        const jr = (j - jc) / GRID;
+        const d = (ic - jc) * (ic - jc) + (ir - jr) * (ir - jr);
+        if (d < best) {
+          best = d;
+          a = i;
+          b = j;
+        }
+      }
+    }
+    if (a < 0) continue;
+    const ac = a % GRID;
+    const ar = (a - ac) / GRID;
+    const bc = b % GRID;
+    const br = (b - bc) / GRID;
+    const steps = Math.max(Math.abs(bc - ac), Math.abs(br - ar));
+    for (let k = 1; k < steps; k++) {
+      const c = Math.round(ac + ((bc - ac) * k) / steps);
+      const r = Math.round(ar + ((br - ar) * k) / steps);
+      grid[r * GRID + c] = 1;
+    }
+  }
+}
+
 export function rasterStickman(p: StickmanInput): StickmanRaster {
   'worklet';
   const lively = p.motion >= 1 ? 1 : 0;
@@ -440,6 +546,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   let swingR = NaN;
   let kneeSide = 0;
   let toes = grounded ? 1 : 0;
+  let prop = PROP_NONE;
 
   // Sway: hips swing, shoulders counter-swing, feet stay planted.
   const sw = p.sway * Math.sin(tq * 5.2) * 1.3 * m;
@@ -546,8 +653,9 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
         bendR += Math.sin(tq * 9) * 0.5 * m;
         break;
       case S_DIZZY:
+        // The head wobbles round, dipping (never lifting off the neck).
         headDX += Math.round(Math.cos(tq * 7) * 1.2 * m);
-        headDU += Math.round(Math.sin(tq * 7) * 0.8 * m);
+        headDU -= Math.round(Math.max(0, Math.sin(tq * 7)) * 0.8 * m);
         break;
       case S_HELD: {
         const k = Math.sin(tq * 9) * m;
@@ -589,6 +697,90 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
         reachLU = -2.5;
         reachRX = 1.2;
         reachRU = -2.5;
+        break;
+      case S_WATERING:
+        // Leaning in with the can held out, tipping it in little pours; other hand on the hip.
+        prop = PROP_CAN;
+        reachRX = 5.5;
+        reachRU = -0.5 - (Math.floor(tq * 2.5) % 2) * 0.6 * m;
+        reachLX = -2.6;
+        reachLU = -TORSO + 1.5;
+        chestDX += 0.7;
+        headDX += 1;
+        break;
+      case S_READING:
+        // Book held up in both hands, head bowed over it.
+        prop = PROP_BOOK;
+        reachLX = -2;
+        reachLU = -1.5;
+        reachRX = 2;
+        reachRU = -1.5;
+        headDU -= 1;
+        break;
+      case S_REACHING:
+        // Up on tiptoe, arm stretched up and out, fingers wiggling for it.
+        reachRX = 6;
+        reachRU = 2.5 + (Math.floor(tq * 6) % 2) * 0.5 * m;
+        chestDX += 0.5;
+        headDX += 1;
+        lift = Math.max(lift, 1);
+        break;
+      case S_TUGGING:
+        // Yanking it down: arm pulled in, knees giving.
+        reachRX = 4.5;
+        reachRU = -0.5;
+        crouch += 0.35;
+        headDX += 1;
+        break;
+      case S_PEEKING: {
+        // Hand shading the eyes, rocking up on tiptoe, scanning left and right.
+        reachRX = 1.6;
+        reachRU = 5.6;
+        headDX = Math.round(Math.sin(tq * 1.6) * 1.2);
+        if (Math.floor(tq * 1.5) % 2) lift = Math.max(lift, 1);
+        break;
+      }
+      case S_POINTING:
+        // Tracing the stars with a raised finger, other hand on the hip.
+        reachRX = 1.5 + Math.round(Math.sin(tq * 1.8) * 1.5);
+        reachRU = 8;
+        reachLX = -2.6;
+        reachLU = -TORSO + 1.5;
+        break;
+      case S_WATCH:
+        // Wrist up in front of the face, the other hand tapping it.
+        reachLX = 0.2;
+        reachLU = 2.5;
+        reachRX = 1;
+        reachRU = 2.5 + (Math.floor(tq * 4) % 2) * 0.8 * m;
+        headDX -= 1;
+        headDU -= 1;
+        break;
+      case S_CLAPPING: {
+        const shut = Math.floor(tq * 5) % 2 === 1;
+        // Clapping in front of the chest.
+        reachLX = shut ? -0.5 : -2.6;
+        reachLU = -1;
+        reachRX = shut ? 0.5 : 2.6;
+        reachRU = -1;
+        break;
+      }
+      case S_PRESENTING:
+        // "Ta-da!": both arms out, palms up.
+        reachLX = -6;
+        reachLU = 0.5;
+        reachRX = 6;
+        reachRU = 0.5;
+        break;
+      case S_SITTING:
+        // Sat down low, knees apart, hands on the knees, swinging a foot.
+        crouch = 1.3;
+        spread = 4;
+        reachLX = -3.2;
+        reachLU = -6.5;
+        reachRX = 3.2;
+        reachRU = -6.5;
+        if (Math.floor(tq * 2) % 2) footRU += 1 * m;
         break;
     }
   }
@@ -653,7 +845,7 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     // Lying down the jolt runs along the body: the head and chest shove
     // toward the wall and spring back, the knees fold up.
     const along = rc * lieDir;
-    headDU += Math.round(along * 1.5);
+    // (The torso stretches and squeezes; the head rides on it, so the neck never parts.)
     torso += along;
     crouch += Math.abs(rc) * 0.4 + fl * 0.6;
     armL += fl * (1 + jit * 0.6);
@@ -765,6 +957,13 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   pt[BAR_R + 1] = pt[SH_R + 1];
   pt[COL_L + 1] = chestU + 1 + (pt[SH_L + 1] - chestU) * 0.5;
   pt[COL_R + 1] = chestU + 1 + (pt[SH_R + 1] - chestU) * 0.5;
+  // The spine reaches up to the shoulder bar where it crosses it, so a shrug
+  // (arms flung up in a big jump or a knock) never leaves the shoulders, arms
+  // and head floating above the body.
+  const barSpan = pt[SH_R] - pt[SH_L];
+  const barK = Math.abs(barSpan) > 0.01 ? Math.max(0, Math.min(1, (pt[SPINE_HI] - pt[SH_L]) / barSpan)) : 0.5;
+  const barU = pt[SH_L + 1] + (pt[SH_R + 1] - pt[SH_L + 1]) * barK;
+  pt[SPINE_HI + 1] = Math.max(pt[SPINE_HI + 1], barU - 1);
 
   // Arms never poke through the walls or the ceiling: against a wall the arm
   // straightens along it (down, or up if it was raised); under the ceiling the
@@ -877,6 +1076,35 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
     if (pt[FOOT_R + 1] < 1 && toeFits(tr)) plot(grid, C + cellIn(tr), rowOf(0), 1);
   }
 
+  // Props in hand (only standing upright; a knock or a lie-down drops them out of view).
+  if (prop !== PROP_NONE && upright) {
+    const stamp = (rows: readonly string[], c0: number, r0: number) => {
+      'worklet';
+      for (let j = 0; j < rows.length; j++)
+        for (let i = 0; i < rows[j].length; i++) {
+          const ch = rows[j][i];
+          if (ch === '#') plot(grid, c0 + i, r0 + j, 1);
+          else if (ch === 'o') plot(grid, c0 + i, r0 + j, 0);
+        }
+    };
+    if (prop === PROP_CAN) {
+      const c0 = C + cellIn(pt[HAND_R]) - 1;
+      const r0 = rowOf(Math.floor(pt[HAND_R + 1]));
+      stamp(CAN, c0, r0);
+      // Water drips from the spout.
+      const f = Math.floor(t * 10);
+      for (let k = 0; k < 2; k++) plot(grid, c0 + CAN_TIP_C, r0 + CAN_TIP_R + 2 + ((f + k * 3) % 6), 1);
+    } else {
+      const mid = (pt[HAND_L] + pt[HAND_R]) / 2;
+      const c0 = C + cellIn(mid) - 3;
+      const r0 = rowOf(Math.floor(Math.max(pt[HAND_L + 1], pt[HAND_R + 1]))) - 1;
+      stamp(BOOK, c0, r0);
+      // Now and then a page turns over the spine.
+      const lt = (t + p.seed) % 2.2;
+      if (lt < 0.35 * m) stamp(lt < 0.17 ? ['....#..', '...#...'] : ['..#....', '...#...'], c0, r0 - 2);
+    }
+  }
+
   // Head: a solid 4×4 block with its top corners cut, over a 2-dot neck
   // (cells -2..1 around its center), turned in quarter steps as it tips.
   const hc = Math.round(C + pt[HEAD]);
@@ -902,14 +1130,29 @@ export function rasterStickman(p: StickmanInput): StickmanRaster {
   const cells = ACCESSORY_CELLS[p.accessory] ?? ACCESSORY_CELLS[0];
   for (let i = 0; i < cells.length; i += 2) at(cells[i], cells[i + 1], 2);
 
-  // Nothing passes through the screen's edges: whatever would is flattened against them.
-  const minCol = Math.round(C - p.roomL);
-  const maxCol = Math.round(C + p.roomR);
-  const minRow = Math.round(GRID - (p.roomT - lift));
-  for (let r = 0; r < GRID; r++)
-    for (let col = 0; col < GRID; col++) if (col < minCol || col >= maxCol || r < minRow) grid[r * GRID + col] = 0;
+  // Nothing passes through the screen's edges: whatever would is flattened
+  // against them. (Clamping each dot to the edge, rather than erasing it,
+  // keeps every limb joined to the body: a cut elbow would leave a floating hand.)
+  const minCol = Math.max(0, Math.round(C - p.roomL));
+  const maxCol = Math.min(GRID - 1, Math.round(C + p.roomR) - 1);
+  const minRow = Math.min(GRID - 1, Math.max(0, Math.round(GRID - (p.roomT - lift))));
+  let out = grid;
+  if (minCol > 0 || maxCol < GRID - 1 || minRow > 0) {
+    out = new Array(GRID * GRID).fill(0);
+    for (let r = 0; r < GRID; r++)
+      for (let col = 0; col < GRID; col++) {
+        const v = grid[r * GRID + col];
+        if (v === 0) continue;
+        const k = Math.max(minRow, r) * GRID + Math.max(minCol, Math.min(maxCol, col));
+        // Body dots win over accessory dots where they pile up.
+        if (out[k] !== 1) out[k] = v;
+      }
+  }
 
-  return { grid, lift };
+  // Last line of defense: rounding a turned figure onto the dot grid can leave
+  // a one-dot gap at a joint, so any loose piece is joined back on.
+  joinStrays(out, st === S_WATERING);
+  return { grid: out, lift };
 }
 
 /** One frame as SVG path data (viewBox 0..GRID). */

@@ -64,7 +64,8 @@ export function ConfirmHost({ scope }: { scope: 'home' | 'settings' }) {
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  // Above the floating nav bar too (it has elevation 10, which wins on Android).
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 100, elevation: 30 },
   wrap: { width: '100%', maxWidth: 380 },
   card: { padding: 22, gap: 10, borderRadius: radii.xl, backgroundColor: colors.paper },
   title: { fontFamily: fonts.bold, fontSize: 19, color: colors.text },
