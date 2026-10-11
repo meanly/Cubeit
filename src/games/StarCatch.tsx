@@ -6,7 +6,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { getBrain } from '../character/useCharacterBrain';
 import { Bitmap, textWidth } from '../lcd/bitmap';
 import { LcdArt } from '../lcd/LcdArt';
-import { floorY, projectX, projectY, WORLD, type RoomGeometry } from '../physics/geometry';
+import { floorY, projectX, projectY, touchesCharacter, WORLD, type RoomGeometry } from '../physics/geometry';
 import { useWorld } from '../physics/World';
 import { feedback } from '../services/feedback';
 import { finishGame } from './results';
@@ -14,6 +14,9 @@ import { useGameSession } from './session';
 
 const ROUND_SECONDS = 40;
 const POOL = 7;
+/** Half the drawn star's size in dots (the 5-dot and 7-dot sprites, a little forgiving). */
+const STAR_RADIUS = 3;
+const GOLD_RADIUS = 4;
 
 interface FallingStar {
   active: number;
@@ -71,6 +74,7 @@ export function StarCatch({ g }: { g: RoomGeometry }) {
     elapsed.value += dt;
     const progress = Math.min(1, elapsed.value / ROUND_SECONDS);
     const b = world.body.value;
+    const g = world.geo.value;
     const events: number[] = [];
     spawnIn.value -= dt;
     const spawn = spawnIn.value <= 0;
@@ -94,7 +98,7 @@ export function StarCatch({ g }: { g: RoomGeometry }) {
         const s = arr[i];
         if (s.active === 0) continue;
         s.y += s.vy * dt;
-        if (s.y <= WORLD.charHeight + 0.04 && s.y > 0.02 && Math.hypot(s.x - b.x, s.z - b.z) < 0.12) {
+        if (s.y > 0 && touchesCharacter(g, s.x, s.z, s.y, s.gold === 1 ? GOLD_RADIUS : STAR_RADIUS, b.x, b.z, b.y)) {
           s.active = 0;
           events.push(s.gold === 1 ? 3 : 1, s.x, s.z);
         } else if (s.y <= 0) {

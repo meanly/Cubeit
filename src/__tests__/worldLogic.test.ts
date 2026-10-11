@@ -1,5 +1,5 @@
 import { circadianEnergy, driftMood, moodLabel } from '../character/mood';
-import { characterRect, makeGeometry, projectX, projectY, unprojectFloor } from '../physics/geometry';
+import { characterRect, makeGeometry, projectX, projectY, touchesCharacter, unprojectFloor, WORLD } from '../physics/geometry';
 import { bodyHalfX, PHYS, scatter, shapeTilt, stepBall, stepBody, stepMess, stepTilt } from '../physics/simulation';
 import { initialBall, initialBody, initialMess, initialTilt, PhysicsEvent, type PhysicsParams, type TiltState } from '../physics/types';
 import { bondLevel, bondProgress, dailyCheck, dayKey, daysBetween, starsForGame } from '../progression/progression';
@@ -46,6 +46,16 @@ describe('room projection', () => {
     const far = characterRect(g, 0.5, 0.7, 0);
     expect(far.height).toBeCloseTo(near.height);
     expect(far.bottom).toBeLessThan(near.bottom);
+  });
+
+  it('catches a falling star that lands on him on screen, whatever its depth', () => {
+    const head = WORLD.charHeight - 0.02;
+    // Same x, very different depth: on the flat LCD that's a few dots, still on him.
+    expect(touchesCharacter(g, 0.5, 0.64, head, 3, 0.5, 0.08, 0)).toBe(true);
+    expect(touchesCharacter(g, 0.55, 0.1, 0.12, 3, 0.5, 0.6, 0)).toBe(true);
+    // Off to the side, or still well above his head: not caught.
+    expect(touchesCharacter(g, 0.8, 0.3, head, 3, 0.5, 0.3, 0)).toBe(false);
+    expect(touchesCharacter(g, 0.5, 0.3, WORLD.charHeight + 0.2, 3, 0.5, 0.3, 0)).toBe(false);
   });
 });
 

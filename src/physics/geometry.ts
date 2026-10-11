@@ -148,3 +148,27 @@ export function characterRect(g: RoomGeometry, x: number, z: number, y: number) 
   const bottom = projectY(g, z, y);
   return { left: cx - w / 2, top: bottom - h, width: w, height: h, cx, bottom, s };
 }
+
+/**
+ * Whether a falling thing at world (x, z, y), `radiusDots` across its middle,
+ * overlaps the character standing at (bx, bz, by) — tested on screen, where it
+ * is seen. Depth is only a few dots of floor strip, so a world-space distance
+ * that includes z would miss things that visibly land on him.
+ */
+export function touchesCharacter(
+  g: RoomGeometry,
+  x: number,
+  z: number,
+  y: number,
+  radiusDots: number,
+  bx: number,
+  bz: number,
+  by: number,
+): boolean {
+  'worklet';
+  const r = characterRect(g, bx, bz, by);
+  const sx = projectX(g, x, z);
+  const sy = projectY(g, z, y);
+  const pad = radiusDots * g.dot;
+  return sx >= r.left - pad && sx <= r.left + r.width + pad && sy >= r.top - pad && sy <= r.bottom;
+}
