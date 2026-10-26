@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cubeit Banner</title>
+<style>
+  @font-face { font-family: Jakarta; font-weight: 800; src: url(../../node_modules/@expo-google-fonts/plus-jakarta-sans/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf); }
+  @font-face { font-family: Pixel; src: url(../../node_modules/@expo-google-fonts/silkscreen/400Regular/Silkscreen_400Regular.ttf); }
+
+  /* Light palette from src/theme/tokens.ts */
+  :root {
+    --bg: #EAEBE6;
+    --bg-center: #F6F6F2;
+    --ink: #231F1C;
+    --dim: #6F6A65;
+    --brand: #306085;
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: Jakarta, 'Segoe UI', sans-serif; color: var(--ink); position: relative; }
+
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(800px 700px at 1340px 540px, rgba(48,96,133,.12), transparent 70%),
+      radial-gradient(1100px 900px at 560px 500px, var(--bg-center), var(--bg) 75%);
+  }
+  .dots {
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(35,31,28,.07) 1.6px, transparent 1.8px);
+    background-size: 22px 22px;
+  }
+
+  .brand { position: absolute; left: 205px; top: 0; bottom: 0; width: 760px; display: flex; flex-direction: column; justify-content: center; }
+  .logo { display: flex; align-items: center; gap: 30px; }
+  .logo img { width: 176px; height: 176px; filter: drop-shadow(0 20px 26px rgba(31,74,115,.25)); }
+  .logo span { font-weight: 800; font-size: 146px; letter-spacing: -4.5px; line-height: 1; }
+  .tag { margin: 34px 0 0 6px; font-family: Pixel; font-size: 40px; letter-spacing: 3px; color: var(--brand); }
+
+  .phone {
+    position: absolute; padding: 8px; border-radius: 54px;
+    background: var(--ink);
+    box-shadow: 0 44px 80px rgba(35,31,28,.26), 0 0 0 2px #3A3530 inset;
+  }
+  .phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 46px; }
+  .phone.front { left: 1028px; top: 140px; width: 374px; height: 800px; transform: rotate(-3deg); }
+  .phone.back { left: 1352px; top: 205px; width: 327px; height: 700px; transform: rotate(7deg); filter: saturate(.9) brightness(.97); }
+
+  .bubble {
+    position: absolute; left: 956px; top: 282px; transform: rotate(-3deg);
+    font-family: Pixel; font-size: 24px; letter-spacing: 2px; color: #1A1D17;
+    background: #A9B596; padding: 12px 20px; border: 4px solid #1A1D17;
+    box-shadow: 5px 5px 0 #1A1D17;
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="dots"></div>
+
+  <section class="brand">
+    <div class="logo"><img src="../assets/cube-1024.png" alt=""><span>cubeit</span></div>
+    <div class="tag">A pocket pixel pal</div>
+  </section>
+
+  <div class="phone back"><img src="../assets/phone-planner-habits-light.png" alt=""></div>
+  <div class="phone front"><img src="../assets/phone-home-light.png" alt=""></div>
+  <div class="bubble">HI THERE!</div>
+</body>
+</html>

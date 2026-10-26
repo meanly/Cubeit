@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cubeit Banner Zoom</title>
+<style>
+  @font-face { font-family: Jakarta; font-weight: 800; src: url(../../node_modules/@expo-google-fonts/plus-jakarta-sans/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf); }
+  @font-face { font-family: Pixel; src: url(../../node_modules/@expo-google-fonts/silkscreen/400Regular/Silkscreen_400Regular.ttf); }
+
+  /* Light palette from src/theme/tokens.ts */
+  :root {
+    --bg: #EAEBE6;
+    --bg-center: #F6F6F2;
+    --ink: #231F1C;
+    --brand: #306085;
+    --lcd: #A9B596;
+    --lcd-ink: #1A1D17;
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: Jakarta, 'Segoe UI', sans-serif; color: var(--ink); position: relative; }
+
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(800px 700px at 1360px 620px, rgba(48,96,133,.12), transparent 70%),
+      radial-gradient(1100px 900px at 560px 500px, var(--bg-center), var(--bg) 75%);
+  }
+  .dots {
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(35,31,28,.07) 1.6px, transparent 1.8px);
+    background-size: 22px 22px;
+  }
+
+  .brand { position: absolute; left: 205px; top: 0; bottom: 0; width: 760px; display: flex; flex-direction: column; justify-content: center; }
+  .logo { display: flex; align-items: center; gap: 30px; }
+  .logo img { width: 176px; height: 176px; filter: drop-shadow(0 20px 26px rgba(31,74,115,.25)); }
+  .logo span { font-weight: 800; font-size: 146px; letter-spacing: -4.5px; line-height: 1; }
+  .tag { margin: 34px 0 0 6px; font-family: Pixel; font-size: 40px; letter-spacing: 3px; color: var(--brand); }
+
+  /* One big phone that runs off the bottom edge, so the room and the stickman fill the frame. */
+  .phone {
+    position: absolute; left: 1010px; top: 106px; width: 700px; height: 1300px;
+    padding: 9px; border-radius: 96px;
+    background: var(--ink);
+    box-shadow: 0 50px 100px rgba(35,31,28,.28), 0 0 0 2px #3A3530 inset;
+  }
+  .screen { position: relative; width: 682px; height: 100%; border-radius: 87px; overflow: hidden; background: #EAEBE6; }
+  .island { position: absolute; left: 234px; top: 18px; width: 214px; height: 62px; border-radius: 31px; background: #000; z-index: 2; }
+
+  /* The screenshot in two crops, with the empty gap between the header and the room cut out.
+     It's 780px wide (2x), drawn at 682px, so 1 source px = 0.874px. */
+  .crop {
+    position: absolute; left: 0; width: 682px;
+    background: url(../assets/phone-home-light.png) no-repeat; background-size: 682px auto;
+  }
+  .crop.header {
+    top: 65px; height: 105px; background-position: 0 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+            mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
+  .crop.room {
+    top: 145px; bottom: 0; background-position: 0 -192px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30px);
+            mask-image: linear-gradient(to bottom, transparent, #000 30px);
+  }
+
+  .bubble {
+    position: absolute; left: 960px; top: 584px;
+    font-family: Pixel; font-size: 34px; letter-spacing: 3px; color: var(--lcd-ink);
+    background: var(--lcd); padding: 16px 28px; border: 5px solid var(--lcd-ink);
+    box-shadow: 7px 7px 0 var(--lcd-ink);
+  }
+  /* Tail on the right, pointing at the stickman's head. */
+  .bubble::after {
+    content: ''; position: absolute; right: -16px; top: 50%; width: 26px; height: 26px;
+    margin-top: -13px; transform: rotate(45deg);
+    background: var(--lcd); border: 5px solid var(--lcd-ink); border-left: 0; border-bottom: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="dots"></div>
+
+  <section class="brand">
+    <div class="logo"><img src="../assets/cube-1024.png" alt=""><span>cubeit</span></div>
+    <div class="tag">A pocket pixel pal</div>
+  </section>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="crop header"></div>
+      <div class="crop room"></div>
+    </div>
+  </div>
+  <div class="bubble">HI THERE!</div>
+</body>
+</html>
